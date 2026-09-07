@@ -1,0 +1,214 @@
+*ai-inline-diff.txt*  Inline edit review for OpenCode, Claude Code, and Antigravity
+
+===============================================================================
+CONTENTS                                                   *ai-inline-diff-contents*
+
+1. Overview...............................................|ai-inline-diff|
+2. Opening the agents.............................|ai-inline-diff-opening|
+3. Reviewing edits.................................|ai-inline-diff-review|
+4. OpenCode mappings.............................|ai-inline-diff-opencode|
+5. Claude Code commands............................|ai-inline-diff-claude|
+6. Antigravity commands.......................|ai-inline-diff-antigravity|
+7. Safety..........................................|ai-inline-diff-safety|
+8. Troubleshooting........................|ai-inline-diff-troubleshooting|
+9. Implementation files.............................|ai-inline-diff-files|
+
+===============================================================================
+1. OVERVIEW                                      *ai* *ai-inline-diff*
+
+This configuration provides a single-window inline review for edits proposed
+by OpenCode, Claude Code, and Antigravity. It does not open a side-by-side diff
+or a new tab.
+
+The review temporarily replaces an editor window with the proposed file:
+
+- Removed/original lines are virtual lines highlighted with |DiffDelete|.
+- Added/proposed lines are highlighted with |DiffAdd|.
+- The original buffer is restored after accepting or rejecting the edit.
+- |'autoread'| reloads files changed by the connected agent.
+
+Claude and Antigravity proposals are editable before acceptance. OpenCode
+proposals are read-only because its permission protocol accepts or rejects
+the original patch as a whole.
+
+===============================================================================
+2. OPENING THE AGENTS                                *ai-inline-diff-opening*
+
+OpenCode ~
+
+                                                  *ai-inline-diff-open-opencode*
+CTRL-.                    Start and connect OpenCode. After connection, toggle
+                          the existing OpenCode terminal.
+
+OpenCode started by Neovim uses a dedicated local port and an inline runtime
+configuration with `permission.edit = "ask"`. This is required so edits can be
+reviewed before they are applied.
+
+Claude Code ~
+
+                                                    *ai-inline-diff-open-claude*
+CTRL-,                    Toggle Claude Code in normal or terminal mode.
+<Leader>ac                Toggle Claude Code.
+<Leader>af                Focus Claude Code.
+<Leader>ar                Resume a Claude Code session.
+<Leader>aC                Continue the latest Claude Code session.
+<Leader>am                Select a Claude model.
+
+Antigravity CLI ~
+
+                                               *ai-inline-diff-open-antigravity*
+:Antigravity              Toggle Antigravity CLI terminal.
+:AntigravityAsk           Send question with context to Antigravity.
+:AntigravitySelectModel   Select Antigravity model.
+:AntigravityResume        Resume latest Antigravity session.
+
+===============================================================================
+3. REVIEWING EDITS                                    *ai-inline-diff-review*
+                                                      *ai-inline-diff-mappings*
+
+The following mappings are local to an active inline review buffer:
+
+da                        Accept the complete proposed edit.
+dr                        Reject the complete proposed edit.
+q                         Reject the edit and restore the original buffer.
+<Leader>aa                Accept the complete proposed edit.
+<Leader>ad                Reject the complete proposed edit.
+]c                        Jump to the next changed hunk.
+[c                        Jump to the previous changed hunk.
+:write                    Accept the complete proposed edit.
+
+Only one inline review is active at a time. A new Claude review rejects an
+older pending review before it opens. A new OpenCode request is rejected when
+another review is active, so its permission request does not remain pending.
+
+===============================================================================
+4. OPENCODE MAPPINGS                                *ai-inline-diff-opencode*
+
+<Leader>oa                Ask OpenCode about the cursor or visual selection.
+<Leader>os                Open the OpenCode action selector.
+go{motion}                Append the operated range to OpenCode.
+goo                       Append the current line to OpenCode.
+CTRL-SHIFT-U              Scroll OpenCode up by half a page.
+CTRL-SHIFT-D              Scroll OpenCode down by half a page.
+
+Terminal window navigation ~
+
+CTRL-H                    Focus the window to the left.
+CTRL-J                    Focus the window below.
+CTRL-K                    Focus the window above.
+CTRL-L                    Focus the window to the right.
+
+Diagnostics ~
+
+:checkhealth opencode     Check the CLI, server and plugin integration.
+
+===============================================================================
+5. CLAUDE CODE COMMANDS                                *ai-inline-diff-claude*
+                                                       *ai-inline-diff-commands*
+
+:ClaudeCode               Toggle the Claude Code terminal.
+:ClaudeCodeFocus          Focus or toggle the Claude Code terminal.
+:ClaudeCodeSelectModel    Select a model.
+:ClaudeCodeAdd {file}     Add a file to Claude context.
+:ClaudeCodeSend           Send a visual selection to Claude.
+:ClaudeCodeTreeAdd        Add a file selected in a file explorer.
+:ClaudeCodeStatus         Show connection status.
+:ClaudeCodeStart          Start the integration server.
+:ClaudeCodeStop           Stop the integration server.
+:ClaudeCodeOpen           Open the Claude terminal.
+:ClaudeCodeClose          Close the Claude terminal.
+:ClaudeCodeDiffAccept     Accept the active inline review.
+:ClaudeCodeDiffDeny       Reject the active inline review.
+:ClaudeCodeCloseAllDiffs  Close all pending Claude reviews.
+
+Context mappings ~
+
+<Leader>ab                Add the current buffer to Claude context.
+<Leader>as                Send a visual selection to Claude.
+<Leader>as                Add the selected explorer file to Claude when used
+                          in NvimTree, neo-tree, oil, minifiles or netrw.
+
+Diagnostics ~
+
+:checkhealth claudecode   Check the CLI, WebSocket server and connection.
+
+===============================================================================
+6. ANTIGRAVITY COMMANDS                            *ai-inline-diff-antigravity*
+                                                   *ai-inline-diff-agy-commands*
+
+:Antigravity              Toggle Antigravity terminal.
+:AntigravityAsk           Ask about selected code or file.
+:AntigravitySelectModel   Choose an AI model.
+:AntigravityResume        Resume previous session.
+:AntigravityDiffAccept    Accept active Antigravity inline review.
+:AntigravityDiffDeny      Reject active Antigravity inline review.
+
+Diagnostics ~
+
+:checkhealth antigravity-cli Check Antigravity CLI and server health.
+
+===============================================================================
+7. SAFETY                                                *ai-inline-diff-safety*
+
+An edit is not accepted when:
+
+- The target buffer already has unsaved changes.
+- The target is a symbolic link whose real file has unsaved buffer changes.
+- The target file changes on disk while the review is open.
+- The target buffer changes or is replaced while the review is open.
+- The OpenCode patch cannot be reconstructed safely.
+
+OpenCode patch failures are rejected automatically. They do not fall back to
+an unreviewed allow dialog.
+
+The OpenCode integration handles paths relative to both the current directory
+and ancestor Git roots. This is needed for `apply_patch`, which can report a
+path relative to the worktree rather than the Neovim working directory.
+
+===============================================================================
+8. TROUBLESHOOTING                              *ai-inline-diff-troubleshooting*
+
+OpenCode edits without showing a review ~
+
+1. Restart Neovim to ensure the dedicated server and event connection are new.
+2. Check that the OpenCode prompt does not display the `auto` indicator.
+3. Run `:checkhealth opencode`.
+4. Confirm that the edit is inside the directory opened by Neovim.
+
+Two OpenCode terminals appear ~
+
+Restart Neovim. The first CTRL-. starts and connects one terminal; later
+presses only toggle that same terminal.
+
+The message "diff could not be rendered" appears ~
+
+The edit is rejected without being applied. Check |:messages| for the detailed
+reason. Supported OpenCode patches include standard unified diffs, consistent
+common indentation trimmed by OpenCode, and paths relative to ancestor Git
+roots. Ambiguous indentation and malformed hunk bodies are rejected.
+
+The review says the edit is stale ~
+
+The target changed after the review opened. Reject the review and ask the
+agent to generate a fresh edit.
+
+===============================================================================
+9. IMPLEMENTATION FILES                                  *ai-inline-diff-files*
+
+Main renderer and protocol adapters: >
+  ~/tinker_git/ai-inline-diff.nvim/lua/ai_inline_diff/init.lua
+<
+Antigravity configuration: >
+  ~/.config/nvim/lua/plugins/antigravity.lua
+<
+OpenCode configuration: >
+  ~/.config/nvim/lua/plugins/opencode.lua
+<
+Claude Code configuration: >
+  ~/.config/nvim/lua/plugins/claude.lua
+<
+This help page: >
+  ~/tinker_git/ai-inline-diff.nvim/doc/ai-inline-diff.txt
+<
+===============================================================================
+vim:tw=78:ts=8:noet:ft=help:norl:
