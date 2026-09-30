@@ -469,6 +469,33 @@ local function detect_trimmed_patch_prefix(old_lines, patch_lines)
 end
 
 function M.apply_unified_patch(original, patch)
+  if patch:match("^%*%*%* Begin Patch") then
+    local patch_lines = split_text(patch)
+    local output = {}
+    local collecting = false
+
+    for _, line in ipairs(patch_lines) do
+      if line:match("^%*%*%* Add File: ") then
+        if collecting then
+          return nil, "Multiple Add File sections are not supported"
+        end
+        collecting = true
+      elseif collecting and line:match("^%*%*%* ") then
+        if line == "*** End Patch" then
+          return join_lines(output, true, "\n")
+        end
+        return nil, "Only single-file Add File patches can be rendered"
+      elseif collecting then
+        if line:sub(1, 1) ~= "+" then
+          return nil, "Add File content must start with +"
+        end
+        output[#output + 1] = line:sub(2)
+      end
+    end
+
+    return nil, "No supported Add File section was found"
+  end
+
   local old_lines, old_has_eol, line_ending = split_text(original)
   local patch_lines = split_text(patch)
   local trimmed_prefix, prefix_err = detect_trimmed_patch_prefix(old_lines, patch_lines)
@@ -664,10 +691,9 @@ function M.setup_opencode()
           local proposed, patch_err = M.apply_unified_patch(original, event.properties.metadata.diff)
           if not proposed then
             vim.notify(
-              "OpenCode edit rejected because its diff could not be rendered: " .. patch_err,
-              vim.log.levels.ERROR
+              "OpenCode diff could not be rendered; answer the pending permission in its terminal: " .. patch_err,
+              vim.log.levels.WARN
             )
-            reject_with_retry()
             return
           end
 

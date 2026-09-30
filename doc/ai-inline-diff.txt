@@ -156,10 +156,10 @@ An edit is not accepted when:
 - The target is a symbolic link whose real file has unsaved buffer changes.
 - The target file changes on disk while the review is open.
 - The target buffer changes or is replaced while the review is open.
-- The OpenCode patch cannot be reconstructed safely.
+- The OpenCode patch cannot be reconstructed safely in the inline review.
 
-OpenCode patch failures are rejected automatically. They do not fall back to
-an unreviewed allow dialog.
+Single-file `Add File` patches and standard unified diffs are rendered inline.
+Other patch formats remain pending for manual review in the OpenCode terminal.
 
 The OpenCode integration handles paths relative to both the current directory
 and ancestor Git roots. This is needed for `apply_patch`, which can report a
@@ -182,10 +182,10 @@ presses only toggle that same terminal.
 
 The message "diff could not be rendered" appears ~
 
-The edit is rejected without being applied. Check |:messages| for the detailed
-reason. Supported OpenCode patches include standard unified diffs, consistent
-common indentation trimmed by OpenCode, and paths relative to ancestor Git
-roots. Ambiguous indentation and malformed hunk bodies are rejected.
+The edit remains pending in the OpenCode terminal. Check |:messages| for the
+detailed reason, then accept or reject it there. Supported inline patches
+include single-file `Add File`, standard unified diffs, consistent common
+indentation trimmed by OpenCode, and paths relative to ancestor Git roots.
 
 The review says the edit is stale ~
 
