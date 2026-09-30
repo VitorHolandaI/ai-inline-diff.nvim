@@ -6,15 +6,33 @@ The plugin renders removed lines with `DiffDelete` virtual lines and proposed
 lines with `DiffAdd`. Claude and Antigravity proposals remain editable; OpenCode proposals are
 read-only because its permission API accepts or rejects the original patch.
 
-## Local Lazy.nvim setup
+## Requirements
+
+This plugin does not talk to the AI tools directly. It hooks into the Neovim
+plugin of each tool, so install at least one of them:
+
+| Tool        | Required plugin                                                                   | Setup call                |
+| ----------- | --------------------------------------------------------------------------------- | ------------------------- |
+| Claude Code | [coder/claudecode.nvim](https://github.com/coder/claudecode.nvim)                 | `setup_claude()`          |
+| OpenCode    | [nickjvandyke/opencode.nvim](https://github.com/nickjvandyke/opencode.nvim)       | `setup_opencode()`        |
+| Antigravity | [McEazy2700/antigravity-cli.nvim](https://github.com/McEazy2700/antigravity-cli.nvim) | `setup_antigravity()` |
+
+## Installation (lazy.nvim)
 
 ```lua
 {
-  name = "ai-inline-diff.nvim",
-  dir = vim.fn.expand("~/tinker_git/ai-inline-diff.nvim"),
+  "VitorHolandaI/ai-inline-diff.nvim",
   lazy = false,
+  dependencies = {
+    -- keep only the integrations you use
+    "coder/claudecode.nvim",
+    "nickjvandyke/opencode.nvim",
+    "McEazy2700/antigravity-cli.nvim",
+  },
 }
 ```
+
+Call the setup functions after the corresponding plugin is configured.
 
 After configuring `coder/claudecode.nvim`:
 
