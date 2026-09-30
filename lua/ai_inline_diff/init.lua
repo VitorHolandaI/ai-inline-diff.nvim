@@ -5,17 +5,8 @@ local reviews = {}
 local current_review
 local resolved_opencode_permissions = {}
 
-local excluded_filetypes = {
-  aerial = true,
-  minifiles = true,
-  netrw = true,
-  neo_tree = true,
-  ["neo-tree"] = true,
-  NvimTree = true,
-  oil = true,
-  snacks_picker_list = true,
-  tagbar = true,
-}
+local canonical_path = require("ai_inline_diff.paths").canonical_path
+local find_editor_window = require("ai_inline_diff.windows").find_editor_window
 
 local function split_text(text)
   local line_ending = text:find("\r\n", 1, true) and "\r\n" or "\n"
@@ -49,11 +40,6 @@ local function read_file(path)
   return text
 end
 
-local function canonical_path(path)
-  local absolute = vim.fs.normalize(vim.fn.fnamemodify(path, ":p"))
-  return vim.uv.fs_realpath(absolute) or absolute
-end
-
 local function resolve_path(path, base_dir)
   if path:sub(1, 1) ~= "/" and base_dir then
     local directory = vim.fs.normalize(base_dir)
@@ -83,54 +69,6 @@ local function resolve_path(path, base_dir)
   end
 
   return vim.fs.normalize(absolute)
-end
-
-local function is_editor_window(win)
-  if not vim.api.nvim_win_is_valid(win) then
-    return false
-  end
-
-  local config = vim.api.nvim_win_get_config(win)
-  if config.relative and config.relative ~= "" then
-    return false
-  end
-
-  local buf = vim.api.nvim_win_get_buf(win)
-  local buftype = vim.bo[buf].buftype
-  local filetype = vim.bo[buf].filetype
-  return buftype ~= "terminal" and buftype ~= "prompt" and not excluded_filetypes[filetype]
-end
-
-local function find_editor_window(path)
-  local normalized_path = path and canonical_path(path)
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    local buf = vim.api.nvim_win_get_buf(win)
-    if
-      normalized_path
-      and canonical_path(vim.api.nvim_buf_get_name(buf)) == normalized_path
-      and is_editor_window(win)
-    then
-      return win
-    end
-  end
-
-  local current = vim.api.nvim_get_current_win()
-  if is_editor_window(current) then
-    return current
-  end
-
-  local current_tab = vim.api.nvim_get_current_tabpage()
-  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(current_tab)) do
-    if is_editor_window(win) then
-      return win
-    end
-  end
-
-  for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if is_editor_window(win) then
-      return win
-    end
-  end
 end
 
 local function find_loaded_buffer(path)
@@ -1088,6 +1026,26 @@ end
 ---@param opts AiInlineDiffTerminalOpts?
 function M.setup_terminal(opts)
   require("ai_inline_diff.terminal").setup(opts)
+end
+
+--- Show lines of a file in an editor window, keeping focus where it is.
+--- Example: `require("ai_inline_diff").open_location("lua/app.lua", 10, 25)`
+---@param path string
+---@param first_line integer
+---@param last_line integer?
+function M.open_location(path, first_line, last_line)
+  require("ai_inline_diff.location").open(path, first_line, last_line)
+end
+
+--- Let agents run `nvim-open-location` from terminals opened afterwards.
+function M.setup_open_location()
+  require("ai_inline_diff.location").setup()
+end
+
+--- Path of the instructions that teach an agent to use nvim-open-location.
+---@return string
+function M.open_location_instructions()
+  return require("ai_inline_diff.location").instructions_path()
 end
 
 return M

@@ -111,6 +111,69 @@ require("ai_inline_diff").setup_terminal({
 })
 ```
 
+## Showing code from the agent
+
+Ask Claude Code or OpenCode to show you something, for example "open the
+place where the parser handles comments", and the file appears in your
+editor window with those lines highlighted. Focus stays in the agent's
+terminal, so you can keep talking while you read.
+
+### How it works
+
+1. At startup, `setup_open_location()` prepends the plugin's `bin/` folder to
+   `$PATH`. Terminals opened after that inherit it and can run
+   `nvim-open-location` by name. Terminals that were already open cannot.
+2. Each agent starts with the instruction file
+   [`instructions/open-location.md`](instructions/open-location.md). Claude
+   Code reads it through `--append-system-prompt-file` and OpenCode through
+   the `instructions` list in its config. The file tells the agent to run the
+   script when you ask to see code, and what to do when the script fails.
+3. The agent finds the code the way it always does, by reading and searching
+   files, and then runs something like:
+
+   ```sh
+   nvim-open-location src/parser.lua:40-72
+   ```
+
+4. Neovim sets `$NVIM` in every terminal it starts to the address of its own
+   server. The script makes the path absolute, because the agent's working
+   directory can differ from Neovim's, and asks that server to run
+   `open_for_remote()` through `nvim --server $NVIM --remote-expr`.
+5. Inside Neovim, `location.lua` loads the file and picks a window. It
+   prefers one that already shows the file, then the nearest editor window in
+   the current tab. It skips a window with a pending review, because
+   replacing that buffer would reject the edit, and opens a split beside the
+   terminal when no window fits. The cursor goes to the first line, centered,
+   and the range is highlighted. The current window never changes.
+6. The script prints Neovim's reply. It exits with 0 when the range is shown,
+   1 when Neovim refused it (missing file or a line outside the file) and 2
+   on bad arguments or an empty `$NVIM`. On a failure the agent reads the
+   message and fixes the path or the range.
+
+The highlight goes away when you enter Insert mode in that buffer or when the
+agent shows another range.
+
+### Setup
+
+Put the script on `$PATH` and hand each agent the instructions file:
+
+```lua
+require("ai_inline_diff").setup_open_location()
+
+-- claudecode.nvim, inside its config function:
+local instructions = require("ai_inline_diff").open_location_instructions()
+opts.terminal_cmd = "claude --append-system-prompt-file " .. vim.fn.shellescape(instructions)
+
+-- opencode.nvim, in the snacks terminal env:
+OPENCODE_CONFIG_CONTENT = vim.json.encode({
+  permission = { edit = "ask" },
+  instructions = { require("ai_inline_diff").open_location_instructions() },
+}),
+```
+
+You can also call it from Lua:
+`require("ai_inline_diff").open_location(path, first, last)`.
+
 ## Review mappings
 
 - `da` or `<leader>aa` accepts the edit, and so does `:write`.
@@ -123,4 +186,5 @@ require("ai_inline_diff").setup_terminal({
 
 ```sh
 nvim -l tests/terminal_test.lua
+nvim -l tests/location_test.lua
 ```

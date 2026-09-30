@@ -1,0 +1,43 @@
+#!/bin/sh
+# Show a file range in the Neovim that owns this terminal, keeping focus in
+# the terminal. Usage: nvim-open-location path[:first[-last]]
+set -eu
+
+if [ $# -ne 1 ]; then
+  echo "usage: nvim-open-location path[:first[-last]], e.g. src/app.lua:10-25" >&2
+  exit 2
+fi
+if [ -z "${NVIM:-}" ]; then
+  echo "nvim-open-location: \$NVIM is empty; run this from a terminal inside Neovim" >&2
+  exit 2
+fi
+
+spec=$1
+case $spec in
+  *:*) path=${spec%:*} range=${spec##*:} ;;
+  *) path=$spec range=1 ;;
+esac
+first=${range%-*}
+last=${range#*-}
+case "$first:$last" in
+  :* | *: | *[!0-9:]*)
+    echo "nvim-open-location: invalid line range in '$spec', expected path:first or path:first-last" >&2
+    exit 2
+    ;;
+esac
+
+# The agent's cwd can differ from Neovim's, so resolve relative paths here.
+case $path in
+  /*) ;;
+  *) path=$PWD/$path ;;
+esac
+# Vimscript single-quoted strings escape ' as ''.
+quoted=$(printf '%s' "$path" | sed "s/'/''/g")
+
+result=$(nvim --server "$NVIM" --remote-expr \
+  "luaeval('require(\"ai_inline_diff.location\").open_for_remote(_A[1], _A[2], _A[3])', ['$quoted', $first, $last])")
+printf '%s\n' "$result"
+case $result in
+  opened*) exit 0 ;;
+  *) exit 1 ;;
+esac

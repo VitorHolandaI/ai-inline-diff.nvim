@@ -4,65 +4,22 @@
 
 local plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 
----@class EmbeddedNvim
----@field chan integer
-local EmbeddedNvim = {}
-EmbeddedNvim.__index = EmbeddedNvim
+package.path = plugin_root .. "/tests/?.lua;" .. package.path
+local helpers = require("helpers.embedded_nvim")
+local recorder = helpers.CheckRecorder.new()
 
----@return EmbeddedNvim
-function EmbeddedNvim.start()
-  local chan = vim.fn.jobstart({ "nvim", "--embed", "--headless", "--clean" }, { rpc = true })
-  if chan <= 0 then
-    error(string.format("failed to start embedded nvim: jobstart returned %d, expected channel > 0", chan))
-  end
-  local self = setmetatable({ chan = chan }, EmbeddedNvim)
-  self:lua("vim.opt.rtp:prepend(...)", plugin_root)
-  return self
-end
-
----@param code string
----@param ... unknown
----@return unknown
-function EmbeddedNvim:lua(code, ...)
-  return vim.rpcrequest(self.chan, "nvim_exec_lua", code, { ... })
-end
-
----@param keys string
-function EmbeddedNvim:input(keys)
-  vim.rpcrequest(self.chan, "nvim_input", keys)
-  vim.wait(150)
-end
-
----@return { in_terminal: boolean, mode: string }
-function EmbeddedNvim:focus()
-  return self:lua([[
-    return { in_terminal = vim.bo.buftype == "terminal", mode = vim.api.nvim_get_mode().mode }
-  ]])
-end
-
-function EmbeddedNvim:stop()
-  vim.fn.jobstop(self.chan)
+local function check(name, actual, expected)
+  recorder:check(name, actual, expected)
 end
 
 -- Editor on the left, terminal running `cat` on the right, focus on editor.
 local function open_editor_and_terminal(opts)
-  local nvim = EmbeddedNvim.start()
+  local nvim = helpers.EmbeddedNvim.start(plugin_root)
   nvim:lua("require('ai_inline_diff').setup_terminal(...)", opts or vim.empty_dict())
   nvim:lua("vim.cmd('vsplit | wincmd l | terminal cat')")
   nvim:lua("vim.cmd('stopinsert | wincmd h')")
   vim.wait(150)
   return nvim
-end
-
-local failures = 0
-
-local function check(name, actual, expected)
-  if vim.deep_equal(actual, expected) then
-    print("ok   " .. name)
-    return
-  end
-  failures = failures + 1
-  print(string.format("FAIL %s: got %s, expected %s", name, vim.inspect(actual), vim.inspect(expected)))
 end
 
 local function test_entering_terminal_starts_terminal_mode()
@@ -116,8 +73,4 @@ test_finished_terminal_stays_in_normal_mode()
 test_options_disable_features()
 test_invalid_option_is_rejected()
 
-if failures > 0 then
-  print(string.format("%d check(s) failed", failures))
-  os.exit(1)
-end
-print("all checks passed")
+recorder:finish()
