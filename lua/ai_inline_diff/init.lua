@@ -1083,4 +1083,11 @@ function M.setup_antigravity()
   end
 end
 
+--- Enter agent terminals in terminal mode and leave them with <C-w>.
+--- Example: `require("ai_inline_diff").setup_terminal({ window_keys = false })`
+---@param opts AiInlineDiffTerminalOpts?
+function M.setup_terminal(opts)
+  require("ai_inline_diff.terminal").setup(opts)
+end
+
 return M

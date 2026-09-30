@@ -1,58 +1,92 @@
 # ai-inline-diff.nvim
 
-Single-window inline review for edits proposed by Claude Code, OpenCode, and Antigravity.
+Review edits from Claude Code, OpenCode, and Antigravity inside the window you
+are already editing in, instead of a side-by-side diff or a new tab.
 
-The plugin renders removed lines with `DiffDelete` virtual lines and proposed
-lines with `DiffAdd`. Claude and Antigravity proposals remain editable; OpenCode proposals are
-read-only because its permission API accepts or rejects the original patch.
+Removed lines show up as `DiffDelete` virtual lines and proposed lines are
+highlighted with `DiffAdd`. You can edit Claude and Antigravity proposals
+before accepting them. OpenCode proposals are read-only, because OpenCode's
+permission API only accepts or rejects the original patch.
 
 ## Requirements
 
-This plugin does not talk to the AI tools directly. It hooks into the Neovim
-plugin of each tool, so install at least one of them:
+You need the Neovim plugin for each agent you use. This plugin never talks to
+the agents directly; it hooks into their plugins.
 
-| Tool        | Required plugin                                                                   | Setup call                |
-| ----------- | --------------------------------------------------------------------------------- | ------------------------- |
-| Claude Code | [coder/claudecode.nvim](https://github.com/coder/claudecode.nvim)                 | `setup_claude()`          |
-| OpenCode    | [nickjvandyke/opencode.nvim](https://github.com/nickjvandyke/opencode.nvim)       | `setup_opencode()`        |
-| Antigravity | [McEazy2700/antigravity-cli.nvim](https://github.com/McEazy2700/antigravity-cli.nvim) | `setup_antigravity()` |
+| Agent       | Plugin                                                                                  | Setup call            |
+| ----------- | --------------------------------------------------------------------------------------- | --------------------- |
+| Claude Code | [coder/claudecode.nvim](https://github.com/coder/claudecode.nvim)                       | `setup_claude()`      |
+| OpenCode    | [nickjvandyke/opencode.nvim](https://github.com/nickjvandyke/opencode.nvim)             | `setup_opencode()`    |
+| Antigravity | [McEazy2700/antigravity-cli.nvim](https://github.com/McEazy2700/antigravity-cli.nvim)   | `setup_antigravity()` |
 
-## Installation (lazy.nvim)
+## Installation
+
+### lazy.nvim
+
+Add this to your plugin specs and keep only the agents you use. Each
+`setup_*()` call goes in the agent plugin's own `config`, after that plugin's
+`setup()`.
 
 ```lua
-{
-  "VitorHolandaI/ai-inline-diff.nvim",
-  lazy = false,
-  dependencies = {
-    -- keep only the integrations you use
+return {
+  {
+    "VitorHolandaI/ai-inline-diff.nvim",
+    lazy = false,
+    config = function()
+      require("ai_inline_diff").setup_terminal()
+    end,
+  },
+  {
     "coder/claudecode.nvim",
+    dependencies = { "folke/snacks.nvim", "VitorHolandaI/ai-inline-diff.nvim" },
+    config = function(_, opts)
+      require("claudecode").setup(opts)
+      require("ai_inline_diff").setup_claude()
+    end,
+  },
+  {
     "nickjvandyke/opencode.nvim",
+    dependencies = { "folke/snacks.nvim", "VitorHolandaI/ai-inline-diff.nvim" },
+    config = function()
+      require("ai_inline_diff").setup_opencode()
+    end,
+  },
+  {
     "McEazy2700/antigravity-cli.nvim",
+    dependencies = { "folke/snacks.nvim", "VitorHolandaI/ai-inline-diff.nvim" },
+    config = function(_, opts)
+      require("antigravity-cli").setup(opts)
+      require("ai_inline_diff").setup_antigravity()
+    end,
   },
 }
 ```
 
-Call the setup functions after the corresponding plugin is configured.
-
-After configuring `coder/claudecode.nvim`:
+### vim.pack (Neovim 0.12+)
 
 ```lua
-require("ai_inline_diff").setup_claude()
+vim.pack.add({ "https://github.com/VitorHolandaI/ai-inline-diff.nvim" })
+require("ai_inline_diff").setup_terminal()
 ```
 
-After configuring `McEazy2700/antigravity-cli.nvim`:
+Then call `setup_claude()`, `setup_opencode()`, or `setup_antigravity()` after
+you set up the matching agent plugin.
 
-```lua
-require("ai_inline_diff").setup_antigravity()
+### Without a plugin manager
+
+Clone it into Neovim's package directory and it loads on the next start:
+
+```sh
+git clone https://github.com/VitorHolandaI/ai-inline-diff.nvim \
+  ~/.local/share/nvim/site/pack/plugins/start/ai-inline-diff.nvim
 ```
 
-After configuring `nickjvandyke/opencode.nvim`:
+The `setup_*()` calls are the same as above.
 
-```lua
-require("ai_inline_diff").setup_opencode()
-```
+### OpenCode permissions
 
-OpenCode must run with edit permissions set to `ask`:
+OpenCode has to ask before editing, or its edits land on disk before you can
+review them. Start it with:
 
 ```lua
 env = {
@@ -60,11 +94,33 @@ env = {
 }
 ```
 
+## Moving between the editor and agent terminals
+
+`setup_terminal()` changes how every terminal window behaves. Focusing a
+terminal puts you in terminal mode right away, so you can type without
+pressing `i`. From inside a terminal, `<C-w>{cmd}` (for example `<C-w>h` or
+`<C-w>w`) and `<C-h/j/k/l>` move to another window.
+
+The agent no longer receives `<C-w>`, so use Alt-Backspace to delete a word.
+To keep either behavior off:
+
+```lua
+require("ai_inline_diff").setup_terminal({
+  auto_insert = false, -- stay in Normal mode when focusing a terminal
+  window_keys = false, -- leave <C-w> and <C-h/j/k/l> to the terminal
+})
+```
+
 ## Review mappings
 
-- `da` or `<leader>aa`: accept.
-- `dr`, `q`, or `<leader>ad`: reject.
-- `[c` and `]c`: navigate changes.
-- `:write`: accept.
+- `da` or `<leader>aa` accepts the edit, and so does `:write`.
+- `dr`, `q`, or `<leader>ad` rejects it.
+- `[c` and `]c` jump between changes.
 
-Run `:help ai` for usage, safety guarantees, and troubleshooting.
+`:help ai` covers usage, safety checks, and troubleshooting.
+
+## Tests
+
+```sh
+nvim -l tests/terminal_test.lua
+```

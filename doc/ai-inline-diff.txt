@@ -62,6 +62,27 @@ Antigravity CLI ~
 :AntigravitySelectModel   Select Antigravity model.
 :AntigravityResume        Resume latest Antigravity session.
 
+Moving between the editor and agent terminals ~
+                                                    *ai-inline-diff-terminal*
+Call this once in your configuration: >lua
+  require("ai_inline_diff").setup_terminal()
+<
+It applies to every terminal window, not only agent terminals:
+
+- Focusing a terminal enters terminal mode, so you can type right away.
+  Terminals whose process has exited stay in Normal mode.
+- CTRL-W {cmd} works from terminal mode, e.g. CTRL-W h or CTRL-W w.
+  The terminal program no longer receives CTRL-W; use ALT-BACKSPACE to
+  delete a word in OpenCode or Claude Code.
+- CTRL-H, CTRL-J, CTRL-K and CTRL-L focus the window in that direction.
+
+Both parts can be turned off: >lua
+  require("ai_inline_diff").setup_terminal({
+    auto_insert = false, -- keep Normal mode when focusing a terminal
+    window_keys = false, -- leave CTRL-W and CTRL-H/J/K/L to the terminal
+  })
+<
+
 ===============================================================================
 3. REVIEWING EDITS                                    *ai-inline-diff-review*
                                                       *ai-inline-diff-mappings*
@@ -93,10 +114,7 @@ CTRL-SHIFT-D              Scroll OpenCode down by half a page.
 
 Terminal window navigation ~
 
-CTRL-H                    Focus the window to the left.
-CTRL-J                    Focus the window below.
-CTRL-K                    Focus the window above.
-CTRL-L                    Focus the window to the right.
+See |ai-inline-diff-terminal|.
 
 Diagnostics ~
 
@@ -197,6 +215,9 @@ agent to generate a fresh edit.
 
 Main renderer and protocol adapters: >
   ~/tinker_git/ai-inline-diff.nvim/lua/ai_inline_diff/init.lua
+<
+Terminal focus and navigation: >
+  ~/tinker_git/ai-inline-diff.nvim/lua/ai_inline_diff/terminal.lua
 <
 Antigravity configuration: >
   ~/.config/nvim/lua/plugins/antigravity.lua
