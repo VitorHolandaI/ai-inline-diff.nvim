@@ -2,19 +2,21 @@
 
 Standalone scripts for the plugin, run with Neovim's Lua interpreter and no
 external test framework. Each exits with code 1 on any failed check.
+`scenarios_test.lua` and `claude_adapter_test.lua` also need git and network
+access the first time, to clone the pinned agent plugins into `.deps/`.
 
 - `helpers/embedded_nvim.lua` starts a child `nvim --embed --clean` with the
   plugin on `runtimepath` and drives it over RPC (`EmbeddedNvim`), and
   collects results (`CheckRecorder`). Terminal mode and window focus cannot
-  be driven with `feedkeys` in one headless instance, which is why every test
-  file goes through it.
+  be driven with `feedkeys` in one headless instance, so every test that
+  types keys goes through `EmbeddedNvim`. `patch_test.lua` only needs
+  `CheckRecorder`.
 - `terminal_test.lua` checks `../lua/ai_inline_diff/terminal.lua` through
   `setup_terminal()`: terminal mode on focus, leaving with `<C-w>h` and
   `<C-h>`, and option validation.
 - `location_test.lua` checks `../lua/ai_inline_diff/location.lua` through
   `open_location()`, and `../bin/nvim-open-location` as an agent would run
   it: from another cwd, with `$NVIM` pointing at the child.
-
 - `review_test.lua` checks what a review looks like and how it ends, through
   `setup_antigravity()` with `FakeAntigravityDiff` standing in for
   `antigravity-cli.diff` and recording the replies sent to the agent. It

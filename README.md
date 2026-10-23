@@ -10,11 +10,12 @@ permission API only accepts or rejects the original patch.
 
 ## Requirements
 
-You need Neovim 0.12 or newer, which renamed `vim.diff()` to
-`vim.text.diff()` and the `buffer` option of `vim.keymap.set()` to `buf`;
-the plugin uses the new names. You also need the Neovim plugin for each
-agent you use. This plugin never talks to
-the agents directly; it hooks into their plugins.
+You need Neovim 0.12 or newer. That release renamed `vim.diff()` to
+`vim.text.diff()` and the `buffer` option of `vim.keymap.set()` to `buf`,
+and the plugin uses the new names.
+
+You also need the Neovim plugin for each agent you use. This plugin never
+talks to the agents directly; it hooks into their plugins.
 
 | Agent       | Plugin                                                                                  | Setup call            |
 | ----------- | --------------------------------------------------------------------------------------- | --------------------- |
@@ -42,9 +43,8 @@ opencode.nvim's `main` branch has moved to OpenCode v2, which this plugin
 has not been tried with. Pin opencode.nvim to the v1 releases
 (`version = "*"` in lazy.nvim picks v1.0.2) while you use OpenCode 1.x.
 
-The automated tests in `tests/` run the review, terminal and location code
-in Neovim alone and never start an agent. The agent versions above come from
-daily use.
+The automated tests in `tests/` load the pinned agent plugins but never
+start an agent, so the agent CLI versions above come from daily use.
 
 ## Installation
 
@@ -98,7 +98,7 @@ return {
 }
 ```
 
-### vim.pack (Neovim 0.12+)
+### vim.pack
 
 ```lua
 vim.pack.add({ "https://github.com/VitorHolandaI/ai-inline-diff.nvim" })
@@ -214,9 +214,8 @@ You can also call it from Lua:
 
 When a review opens, the editor window takes focus and the first change is
 selected in linewise Visual mode, showing which lines the agent wants to
-write. A change that only removes lines has nothing to
-select, so the cursor goes to where the lines were and you stay in Normal
-mode.
+write. A change that only removes lines has nothing to select, so the
+cursor goes to where the lines were and you stay in Normal mode.
 
 | Keys                    | Modes                  | Action                             |
 | ----------------------- | ---------------------- | ---------------------------------- |
@@ -244,10 +243,10 @@ When the review ends you are in Normal mode in the original buffer.
 
 The plugin only sees edits that the agent sends to Neovim for approval.
 With Claude Code that is an `openDiff` request, with OpenCode an `edit`
-permission request, and with Antigravity a diff it opens. An edit
-the agent makes by running a shell command, such as `sed -i` or
-`echo >> file`, goes straight to disk and never shows up as a review. Neovim's
-`'autoread'`, on by default, reloads the buffer once it notices the change.
+permission request, and with Antigravity a diff it opens. An edit the agent
+makes by running a shell command, such as `sed -i` or `echo >> file`, goes
+straight to disk and never shows up as a review. Neovim's `'autoread'`, on
+by default, reloads the buffer once it notices the change.
 
 [`docs/how-an-edit-flows.md`](docs/how-an-edit-flows.md) follows one edit
 from the agent to the file on disk, with the code that runs at each step.

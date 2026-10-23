@@ -48,7 +48,7 @@ a way for an agent to show a file range in the editor.
 - `paths.lua` holds `canonical_path()`, the absolute, symlink-resolved form
   used to compare file names. `init.lua`, `windows.lua` and `location.lua`
   all compare paths through it.
-- `terminal.lua` owns terminal focus behaviour. It creates the
+- `terminal.lua` owns terminal focus behavior. It creates the
   `AiInlineDiffTerminalInsert` autocmd group that enters terminal mode on
   focus, and the terminal-mode maps for `<C-w>` and `<C-h/j/k/l>`. It knows
   nothing about any agent plugin, so it works for every terminal.

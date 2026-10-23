@@ -1,6 +1,6 @@
 # tests/scenarios
 
-Recorded review sessions for `../scenarios_test.lua`. Each folder is one
+Scripted review sessions for `../scenarios_test.lua`. Each folder is one
 session: an agent proposes an edit to a file, someone types keys into the
 review, and the folder says what the agent must end up writing. The runner
 copies the original into a fresh directory, opens it beside an agent

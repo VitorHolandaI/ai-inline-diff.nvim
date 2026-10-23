@@ -30,8 +30,9 @@ Claude and Antigravity proposals are editable before acceptance. OpenCode
 proposals are read-only because its permission protocol accepts or rejects
 the original patch as a whole.
 
-The plugin never talks to the agents directly. It hooks into each agent's
-Neovim plugin, so those plugins must be installed and set up first:
+It needs Neovim 0.12 or newer. The plugin never talks to the agents
+directly. It hooks into each agent's Neovim plugin, so those plugins must be
+installed and set up first:
 
   Claude Code    coder/claudecode.nvim
   OpenCode       nickjvandyke/opencode.nvim
@@ -89,9 +90,10 @@ When a review opens, its window takes focus and the first change is
 selected in linewise Visual mode. A change that only removes lines has
 nothing to select; the cursor goes to that row in Normal mode.
 
-The following mappings are local to an active inline review buffer. Each
-one acts on the complete edit, even when a single change is selected, and
-leaves you in Normal mode.
+The following mappings are local to an active inline review buffer. The
+ones that accept or reject act on the whole edit, even when a single change
+is selected; ALT-Y and ALT-X act on the selected change only. Each one
+leaves you in Normal mode, except the ones that select a change.
 
 ALT-A                     Accept the edit. Normal, Visual and Insert mode.
 ALT-R                     Reject the edit. Normal, Visual and Insert mode.
@@ -120,6 +122,8 @@ so ALT-Y and ALT-X only show a warning there.
 
 Only edits that the agent sends to Neovim for approval are reviewed. An
 edit made by a shell command, such as `sed -i`, goes straight to disk.
+`docs/how-an-edit-flows.md` follows one edit through the code, from the
+agent to the file on disk.
 
 Only one inline review is active at a time. A new Claude review rejects an
 older pending review before it opens. A new OpenCode request is rejected when
@@ -290,9 +294,10 @@ agent to generate a fresh edit.
 Paths are relative to the plugin's root directory.
 
 lua/ai_inline_diff/init.lua
-    Public functions, review renderer and the adapter for each agent.
+    Public functions, opening and closing a review, and the adapter for
+    each agent.
 lua/ai_inline_diff/review_selection.lua
-    Selecting a change when a review opens and on ]c and [c.
+    Selecting a change when a review opens, on ]c/[c and on ALT-N/ALT-P.
 lua/ai_inline_diff/review_keys.lua
     Mappings of the review buffer.
 lua/ai_inline_diff/review_changes.lua
