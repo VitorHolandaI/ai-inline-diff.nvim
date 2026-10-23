@@ -249,6 +249,9 @@ the agent makes by running a shell command, such as `sed -i` or
 `echo >> file`, goes straight to disk and never shows up as a review. Neovim's
 `'autoread'`, on by default, reloads the buffer once it notices the change.
 
+[`docs/how-an-edit-flows.md`](docs/how-an-edit-flows.md) follows one edit
+from the agent to the file on disk, with the code that runs at each step.
+
 `:help ai` covers usage, safety checks, and troubleshooting.
 
 ## Tests
