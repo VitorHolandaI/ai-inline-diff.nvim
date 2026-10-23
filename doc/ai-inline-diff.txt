@@ -316,8 +316,9 @@ indentation trimmed by OpenCode, and paths relative to ancestor Git roots.
 
 The review says the edit is stale ~
 
-The target changed after the review opened. Reject the review and ask the
-agent to generate a fresh edit.
+The file on disk changed after the review opened, or its buffer has unsaved
+edits. Reject the review and ask the agent to generate a fresh edit. A
+reload of the buffer from disk (checktime, live changes) is not a change.
 
 ==============================================================================
 9. IMPLEMENTATION FILES                                 *ai-inline-diff-files*

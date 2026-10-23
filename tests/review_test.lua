@@ -191,6 +191,25 @@ local function test_da_in_visual_accepts_instead_of_deleting()
   nvim:stop()
 end
 
+-- An agent's next edit often lands right after it wrote the one just
+-- accepted; checktime or live_changes then reloads the file's buffer during
+-- the review. That reload brings in the agent's own write, not a user edit.
+local function test_reload_of_agent_write_is_not_stale()
+  local path = write_original_file()
+  local nvim = open_session(path)
+  local first_edit = edited_text({ [1] = "one" })
+  vim.fn.writefile(vim.split(first_edit, "\n", { trimempty = true }), path)
+  local second_edit = edited_text({ [1] = "one", [7] = "seven" })
+  propose(nvim, path, second_edit)
+  nvim:lua("vim.api.nvim_buf_call(vim.fn.bufnr(...), function() vim.cmd('silent! edit!') end)", path)
+  nvim:input("<M-a>")
+  vim.wait(200)
+  local state = review_state(nvim)
+  check("reloaded target still accepts", read_lines(path), vim.split(second_edit, "\n", { trimempty = true }))
+  check("reloaded target replies accepted", state.replies, { "ide/diffAccepted" })
+  nvim:stop()
+end
+
 -- The key hint stays up for a minute and lists only keys that work for the
 -- agent: OpenCode takes or refuses its whole patch, so no <M-y>/<M-x>.
 local function test_key_hint_lasts_a_minute_and_fits_the_agent()
@@ -232,4 +251,5 @@ test_removal_only_change_places_cursor()
 test_alt_a_accepts_from_each_mode()
 test_alt_r_rejects_from_insert()
 test_da_in_visual_accepts_instead_of_deleting()
+test_reload_of_agent_write_is_not_stale()
 recorder:finish()

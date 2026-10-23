@@ -38,7 +38,7 @@ the proposed text, and two callbacks: what to do on accept and on reject.
 
 Claude Code calls its `openDiff` tool. claudecode.nvim runs the tool in a
 coroutine and calls `diff.open_diff_blocking()`, which `setup_claude()`
-replaces (`lua/ai_inline_diff/init.lua:664`):
+replaces (`lua/ai_inline_diff/init.lua:659`):
 
 ```lua
 diff.open_diff_blocking = function(old_file_path, _, new_file_contents, tab_name, client_id)
@@ -71,7 +71,7 @@ OpenCode sends a patch instead of the full file. It arrives as the
 1.x puts it in `properties.metadata.diff`, 2.x in
 `data.metadata.files[1].patch`. `opencode_event.edit_request()` reads
 either one, and the plugin rebuilds the proposed file from the patch right
-away, from the file as it was when OpenCode asked (`init.lua:566`):
+away, from the file as it was when OpenCode asked (`init.lua:561`):
 
 ```lua
 local proposed, patch_err = M.apply_unified_patch(read_file(path) or "", edit.diff)
@@ -93,7 +93,7 @@ that point, so whatever you saved shows up as lines the edit would revert.
 
 ## 2. The texts become a list of changes
 
-`open_review()` diffs the two texts (`init.lua:163`):
+`open_review()` diffs the two texts (`init.lua:160`):
 
 ```lua
 local hunks = vim.text.diff(normalized_old, normalized_new, {
@@ -117,7 +117,7 @@ proposal because the second change added two lines above it.
 ## 3. The review replaces the editor window
 
 `open_review()` then builds a scratch buffer holding the proposed text and
-puts it in the window that showed the file (`init.lua:168-215`). The
+puts it in the window that showed the file (`init.lua:165-211`). The
 buffer has `buftype=acwrite`, so `:write` triggers the plugin instead of
 touching the disk. The window's previous buffer and cursor are saved so
 they can come back when the review ends.
@@ -177,9 +177,11 @@ Antigravity only, since OpenCode reviews are read-only).
 
 `resolve_review()` (`init.lua:108`) first checks that the file did not
 change while you were reviewing. It compares the file on disk with the
-original text and looks at the file's buffer for unsaved changes or a new
-`changedtick`. If anything moved, it refuses with "AI edit is stale" and
-the review stays open.
+original text and looks at the file's buffer for unsaved changes. If
+either moved, it refuses with "AI edit is stale" and the review stays open.
+A reload of that buffer does not count: checktime or live changes often
+reload it during the review, to bring in the edit the agent wrote just
+before this one.
 
 Then it reads the review buffer as text, puts the original buffer back in
 the window, and calls the agent's callback with that text:
@@ -203,7 +205,7 @@ line ending (LF or CRLF) and keeps or drops the final newline to match.
 
 Which side writes the file depends on the agent. For Claude Code, the
 accept callback resumes the waiting coroutine with `FILE_SAVED` and the
-final text (`claude_result()`, `init.lua:641`):
+final text (`claude_result()`, `init.lua:642`):
 
 ```lua
 return { content = { { type = "text", text = "FILE_SAVED" }, { type = "text", text = content } } }
@@ -215,7 +217,7 @@ text. Neovim leaves the file alone here and Claude Code writes it once the
 reply arrives. A rejection sends `DIFF_REJECTED` instead.
 
 Antigravity's accept callback writes the file from Neovim
-(`init.lua:875`). It puts the text into the file's buffer, runs
+(`init.lua:870`). It puts the text into the file's buffer, runs
 `:write!`, and then tells Antigravity the diff was accepted:
 
 ```lua
@@ -231,7 +233,7 @@ send_diff_response("ide/diffAccepted", filePath)
 
 OpenCode applies its own patch. The plugin only answers the permission
 request with `once` or `reject` through `opencode_event.permit()`
-(`init.lua:537`), which calls `server:permit(id, choice)` on 1.x and
+(`init.lua:538`), which calls `server:permit(id, choice)` on 1.x and
 `server:permit(sessionID, id, choice)` on 2.x. On 2.x the reply has to go
 through the server opencode.nvim is already connected to
 (`opencode_event.with_server()`): the background server requires

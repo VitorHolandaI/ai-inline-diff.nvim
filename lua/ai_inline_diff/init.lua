@@ -114,13 +114,10 @@ local function resolve_review(id, accepted, invoke_callback)
   if accepted then
     local disk_text = read_file(review.path) or ""
     local target_changed = disk_text ~= review.original_text
+    -- Only unsaved edits count: a reload (checktime, live_changes) bumps
+    -- changedtick too, and it brings in the agent's own last write.
     local target_buf = find_loaded_buffer(review.path)
-    if target_buf then
-      target_changed = target_changed or vim.bo[target_buf].modified
-      if target_buf == review.target_buf then
-        target_changed = target_changed or vim.api.nvim_buf_get_changedtick(target_buf) ~= review.target_changedtick
-      end
-    end
+    target_changed = target_changed or (target_buf ~= nil and vim.bo[target_buf].modified)
     if target_changed then
       vim.notify(
         "AI edit is stale: the target changed during review; reject it and request a new edit",
@@ -203,12 +200,10 @@ local function open_review(opts)
     previous_signcolumn = vim.wo[win].signcolumn,
     original_text = opts.old_text,
     editable = opts.editable ~= false,
-    target_buf = find_loaded_buffer(opts.path),
     on_accept = opts.on_accept,
     on_reject = opts.on_reject,
     client_id = opts.client_id,
   }
-  review.target_changedtick = review.target_buf and vim.api.nvim_buf_get_changedtick(review.target_buf) or nil
   reviews[opts.id] = review
   current_review = opts.id
 
