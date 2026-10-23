@@ -54,7 +54,8 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
 - `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
   at the edge of what the parser takes: omitted counts, leading zeros,
   numbers so large that `tonumber()` returns `1e+26` or `inf`, non-ASCII
-  digits. Each must give the right text or a clean `(nil, message)` within
+  digits, and the `Index:` / `====` header that OpenCode 2.x's jsdiff
+  writes. Each must give the right text or a clean `(nil, message)` within
   100 ms.
 - `claude_adapter_test.lua` loads the pinned claudecode.nvim and checks how
   `setup_claude()` answers through `_G.claude_deferred_responses`, the

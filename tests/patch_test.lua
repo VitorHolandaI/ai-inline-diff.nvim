@@ -45,6 +45,27 @@ local cases = {
   { name = "non-ASCII digits are not a hunk header", patch = "@@ -١,1 +1,1 @@\n-b\n+B\n" },
   { name = "letters in the header", patch = "@@ -1x +1 @@\n-b\n+B\n" },
   { name = "no hunk at all", patch = "", error = "No unified diff hunks" },
+  {
+    -- OpenCode 2.1.4 builds patches with jsdiff, which adds an Index line and
+    -- an underline before the --- / +++ headers.
+    name = "jsdiff header from OpenCode 2.x",
+    patch = table.concat({
+      "Index: notes/a.md",
+      "===================================================================",
+      "--- notes/a.md",
+      "+++ notes/a.md",
+      "@@ -2,1 +2,1 @@",
+      "-b",
+      "+B",
+      "",
+    }, "\n"),
+    result = "a\nB\nc\n",
+  },
+  {
+    name = "jsdiff header with tab-separated file headers",
+    patch = "Index: a\n" .. string.rep("=", 67) .. "\n--- a\told\n+++ a\tnew\n@@ -2 +2 @@\n-b\n+B\n",
+    result = "a\nB\nc\n",
+  },
 }
 
 for _, case in ipairs(cases) do

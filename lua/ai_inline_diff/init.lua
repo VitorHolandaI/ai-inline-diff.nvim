@@ -384,6 +384,9 @@ function M.apply_unified_patch(original, patch)
       local is_header = line == ""
         or line:match("^diff %-%-git ")
         or line:match("^index ")
+        -- jsdiff, which OpenCode 2.x uses, writes an Index line and an underline.
+        or line:match("^Index: ")
+        or line:match("^=+$")
         or line:match("^%-%-%- ")
         or line:match("^%+%+%+ ")
       if not is_header then

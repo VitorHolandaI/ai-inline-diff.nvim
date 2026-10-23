@@ -299,7 +299,8 @@ The message "diff could not be rendered" appears ~
 
 The edit remains pending in the OpenCode terminal. Check |:messages| for the
 detailed reason, then accept or reject it there. Supported inline patches
-include single-file `Add File`, standard unified diffs, consistent common
+include single-file `Add File`, standard unified diffs (with `git diff`
+headers or the `Index:` header OpenCode 2.x writes), consistent common
 indentation trimmed by OpenCode, and paths relative to ancestor Git roots.
 
 The review says the edit is stale ~
