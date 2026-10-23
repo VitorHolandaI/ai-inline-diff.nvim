@@ -258,10 +258,13 @@ local function open_review(opts)
   -- Read-only reviews (OpenCode) take or refuse the whole edit, so the hint
   -- leaves out the per-change keys. It stays a minute: the default few
   -- seconds were gone before the keys could be read.
-  local hint = review.editable
-      and "AI edit: Alt-n/Alt-p move, Alt-y/Alt-x keep/drop this change, Alt-a/Alt-r accept/reject all"
-    or "AI edit: Alt-n/Alt-p move between changes, Alt-a accept all, Alt-r reject all"
-  vim.notify(hint, vim.log.levels.INFO, { title = "ai-inline-diff", timeout = 60000 })
+  -- One short line per key: the notification box cuts long lines short.
+  local hint = { "AI edit: review keys", "Alt-n / Alt-p  next / previous change" }
+  if review.editable then
+    hint[#hint + 1] = "Alt-y / Alt-x  keep / drop this change"
+  end
+  vim.list_extend(hint, { "Alt-a          accept all", "Alt-r          reject all" })
+  vim.notify(table.concat(hint, "\n"), vim.log.levels.INFO, { title = "ai-inline-diff", timeout = 60000 })
   return review
 end
 

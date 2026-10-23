@@ -210,8 +210,23 @@ local function test_reload_of_agent_write_is_not_stale()
   nvim:stop()
 end
 
+-- Longest hint line that fits snacks.nvim's notifier: 40 columns wide at
+-- least, minus the padding on each side.
+local hint_max_width = 38
+
+---@param message string
+---@return integer
+local function widest_line(message)
+  local widest = 0
+  for _, line in ipairs(vim.split(message, "\n")) do
+    widest = math.max(widest, vim.fn.strdisplaywidth(line))
+  end
+  return widest
+end
+
 -- The key hint stays up for a minute and lists only keys that work for the
 -- agent: OpenCode takes or refuses its whole patch, so no <M-y>/<M-x>.
+-- Each line fits the notification box, which cuts longer ones short.
 local function test_key_hint_lasts_a_minute_and_fits_the_agent()
   local path = write_original_file()
   local nvim = open_session(path)
@@ -227,6 +242,7 @@ local function test_key_hint_lasts_a_minute_and_fits_the_agent()
   local editable = nvim:lua("return _G.hints[#_G.hints]") or {}
   check("editable review hint lasts 60 s", editable.timeout, 60000)
   check("editable review hint lists Alt-y/Alt-x", tostring(editable.message):find("Alt-y", 1, true) ~= nil, true)
+  check("editable review hint fits the box", widest_line(tostring(editable.message)) <= hint_max_width, true)
   nvim:input("<M-r>")
 
   nvim:lua("package.loaded.agent_doubles = dofile(...)", plugin_root .. "/tests/helpers/agent_doubles.lua")
@@ -240,6 +256,7 @@ local function test_key_hint_lasts_a_minute_and_fits_the_agent()
   check("OpenCode review hint lasts 60 s", read_only.timeout, 60000)
   check("OpenCode review hint leaves out Alt-y/Alt-x", tostring(read_only.message):find("Alt-y", 1, true), nil)
   check("OpenCode review hint keeps Alt-a", tostring(read_only.message):find("Alt-a", 1, true) ~= nil, true)
+  check("OpenCode review hint fits the box", widest_line(tostring(read_only.message)) <= hint_max_width, true)
   nvim:stop()
 end
 
