@@ -10,6 +10,7 @@ local review_keys = require("ai_inline_diff.review_keys")
 local review_selection = require("ai_inline_diff.review_selection")
 local review_changes = require("ai_inline_diff.review_changes")
 local text = require("ai_inline_diff.text")
+local opencode_event = require("ai_inline_diff.opencode_event")
 
 local split_text = text.split
 local join_lines = text.join
@@ -491,7 +492,7 @@ function M.setup_opencode()
     callback = function(args)
       local event = args.data.event
       if event.type == "permission.replied" then
-        local key = opencode_permission_key(args.data.url, event.properties.requestID)
+        local key = opencode_permission_key(args.data.url, opencode_event.replied_request_id(event))
         resolved_opencode_permissions[key] = true
         resolve_review("opencode:" .. key, false, false)
         vim.defer_fn(function()
@@ -499,11 +500,18 @@ function M.setup_opencode()
         end, 60000)
         return
       end
-      if event.type ~= "permission.asked" or event.properties.permission ~= "edit" then
+      local edit, unreviewable = opencode_event.edit_request(event)
+      if not edit then
+        if unreviewable then
+          vim.notify(
+            "OpenCode edit not shown inline (" .. unreviewable .. "); answer it in OpenCode or in its permission prompt",
+            vim.log.levels.WARN
+          )
+        end
         return
       end
 
-      local permission_key = opencode_permission_key(args.data.url, event.properties.id)
+      local permission_key = opencode_permission_key(args.data.url, edit.id)
       resolved_opencode_permissions[permission_key] = false
       local id = "opencode:" .. permission_key
       require("opencode.server")
@@ -517,7 +525,7 @@ function M.setup_opencode()
             if resolved_opencode_permissions[permission_key] then
               return
             end
-            server:permit(event.properties.id, choice):catch(function(err)
+            opencode_event.permit(server, edit, choice):catch(function(err)
               notify_permission_error(err)
               if not resolved_opencode_permissions[permission_key] and on_failure then
                 on_failure()
@@ -540,7 +548,8 @@ function M.setup_opencode()
             submit_reply("reject", retry_reject)
           end
 
-          local path = resolve_path(event.properties.metadata.filepath, server.cwd)
+          -- OpenCode 2.x servers have no cwd; resolve_path then tries Neovim's.
+          local path = resolve_path(edit.filepath, server.cwd)
           local loaded_buf = find_loaded_buffer(path)
           if loaded_buf and vim.bo[loaded_buf].modified then
             vim.notify("OpenCode edit rejected: the target buffer has unsaved changes", vim.log.levels.ERROR)
@@ -549,7 +558,7 @@ function M.setup_opencode()
           end
 
           local original = read_file(path) or ""
-          local proposed, patch_err = M.apply_unified_patch(original, event.properties.metadata.diff)
+          local proposed, patch_err = M.apply_unified_patch(original, edit.diff)
           if not proposed then
             vim.notify(
               "OpenCode diff could not be rendered; answer the pending permission in its terminal: " .. patch_err,

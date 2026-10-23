@@ -1,0 +1,7 @@
+--- sample.lua
++++ sample.lua
+@@ -4,3 +4,3 @@
+ if true then
+-  return 1
++  return 10
+ end

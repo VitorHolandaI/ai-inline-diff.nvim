@@ -27,7 +27,8 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
 - `scenarios_test.lua` replays each folder in `scenarios/` (see
   `scenarios/README.md`) in its own child Neovim and compares what the agent
   would write with the scenario's `expected.*`. Pass a folder name to run
-  only that one. It goes through two helpers:
+  only that one. `reply = "pending"` means no answer may be sent, as for an
+  OpenCode 2.x edit over several files. It goes through two helpers:
   - `helpers/agent_plugins.lua` pins claudecode.nvim and
     antigravity-cli.nvim to the commits in the main README's "Versions in
     use" and clones them into `.deps/` (git-ignored) on the first run.
@@ -36,8 +37,14 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
     as Claude Code's `openDiff` would, replaces
     `antigravity-cli.server.notify` to record Antigravity's replies, and
     fires `OpencodeEvent:permission.asked` with `FakeOpencodeServer`
-    standing in for `opencode.server`. `outcome()` reports what the agent
+    standing in for `opencode.server`. Scenarios with agent `opencode-v2`
+    send the OpenCode 2.x event shape instead, and `FakeOpencodeV2Server`
+    only counts a reply made as `permit(sessionID, id, choice)`. `outcome()` reports what the agent
     would receive.
+- `opencode_event_test.lua` calls `../lua/ai_inline_diff/opencode_event.lua`
+  directly with 1.x and 2.x events: edits, other permissions, 2.x edits
+  without a diff or over two files, replies, and the `permit()` arguments
+  for each version.
 - `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
   at the edge of what the parser takes: omitted counts, leading zeros,
   numbers so large that `tonumber()` returns `1e+26` or `inf`, non-ASCII
@@ -79,6 +86,7 @@ nvim -l tests/scenarios_test.lua
 nvim -l tests/patch_test.lua
 nvim -l tests/claude_adapter_test.lua
 nvim -l tests/deprecated_api_test.lua
+nvim -l tests/opencode_event_test.lua
 nvim -l tests/lint.lua
 nvim -l tests/coverage.lua --missing
 ```

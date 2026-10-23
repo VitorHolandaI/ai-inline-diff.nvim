@@ -45,13 +45,13 @@ their events, so a new release can break it. Versions in use:
   Neovim                 0.12.5
   Claude Code CLI        2.1.282
   claudecode.nvim        main at 2390c6e (v0.3.0+53)
-  OpenCode CLI           1.18.32
-  opencode.nvim          v1.0.2
+  OpenCode CLI           2.1.4
+  opencode.nvim          main at e7643e9
   Antigravity CLI        agy 1.2.14
   antigravity-cli.nvim   main at 43d0d38
 
-opencode.nvim's `main` branch targets OpenCode v2, which has not been tried.
-Keep opencode.nvim on v1 releases while you use OpenCode 1.x.
+OpenCode 2.x needs opencode.nvim's `main` branch, which has no release yet.
+The plugin also reads OpenCode 1.x events, with opencode.nvim v1.0.2.
 
 ==============================================================================
 2. SETUP                                                *ai-inline-diff-setup*
@@ -67,11 +67,16 @@ own setup:
                                                *ai-inline-diff-setup-opencode*
 `require("ai_inline_diff").setup_opencode()`
     Listens to the `OpencodeEvent:permission.asked` autocmd. Each `edit`
-    permission request opens an inline review, and the answer goes back
-    through `opencode.server`. OpenCode only asks when its configuration has
-    `permission.edit = "ask"`; otherwise it writes the file before you can
-    review it. One way to set it is the terminal environment: >lua
-      env = { OPENCODE_CONFIG_CONTENT = '{"permission":{"edit":"ask"}}' }
+    permission request for a single file opens an inline review, and the
+    answer goes back through `opencode.server`. Both the OpenCode 1.x and
+    2.x event shapes are read (`lua/ai_inline_diff/opencode_event.lua`).
+    An edit across several files is left to opencode.nvim's own prompt.
+
+    OpenCode only asks when its configuration has `permission.edit =
+    "ask"`; otherwise it writes the file before you can review it. OpenCode
+    2.x runs one background server and reads its configuration when that
+    server starts, so set it in `~/.config/opencode/opencode.jsonc`: >json
+      { "permission": { "edit": "ask" } }
 <
                                             *ai-inline-diff-setup-antigravity*
 `require("ai_inline_diff").setup_antigravity()`
@@ -188,7 +193,7 @@ OpenCode       CTRL-ALT-Y/CTRL-ALT-E scroll a line, CTRL-ALT-U/CTRL-ALT-D
                half a page, PageUp/PageDown a page, CTRL-G and CTRL-ALT-G
                jump to the first and last message.
 
-These are the defaults of Claude Code 2.1.282 and OpenCode 1.18.32.
+These are the defaults of Claude Code 2.1.282 and OpenCode 2.1.4.
 
 ==============================================================================
 6. SHOWING CODE FROM THE AGENT                  *ai-inline-diff-open-location*
@@ -238,7 +243,7 @@ Setup: >lua
 Then give each agent the file returned by
 `require("ai_inline_diff").open_location_instructions()`. Claude Code takes
 it with `claude --append-system-prompt-file`, OpenCode with `instructions`
-in `OPENCODE_CONFIG_CONTENT`. The README has a complete example.
+in `~/.config/opencode/opencode.jsonc`. The README has a complete example.
 
 You can also call it from Lua:
 `require("ai_inline_diff").open_location(path, first, last)`.
@@ -271,8 +276,11 @@ The agent changed a file without showing a review ~
    its edit tool.
 2. Check that the setup function for that agent ran after the agent
    plugin's own setup (|ai-inline-diff-setup|).
-3. For OpenCode, check that `permission.edit` is `"ask"` and that the
-   OpenCode prompt does not display the `auto` indicator.
+3. For OpenCode, check that `permission.edit` is `"ask"` in
+   `~/.config/opencode/opencode.jsonc` and that the OpenCode prompt does
+   not display the `auto` indicator. With OpenCode 2.x, run
+   `opencode service restart` after changing it, since the background
+   server reads its configuration only when it starts.
 4. Run `:checkhealth claudecode`, `:checkhealth opencode` or
    `:checkhealth antigravity-cli`.
 
@@ -304,6 +312,8 @@ lua/ai_inline_diff/review_changes.lua
     Drawing changes, and keeping or dropping one change at a time.
 lua/ai_inline_diff/text.lua
     Splitting and joining file content.
+lua/ai_inline_diff/opencode_event.lua
+    Reading OpenCode 1.x and 2.x permission events and replying to them.
 lua/ai_inline_diff/terminal.lua
     Terminal focus and navigation.
 lua/ai_inline_diff/location.lua

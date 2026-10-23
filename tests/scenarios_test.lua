@@ -13,9 +13,10 @@ local agent_plugins = require("helpers.agent_plugins")
 local recorder = helpers.CheckRecorder.new()
 
 ---@class Scenario
----@field agent "claude"|"antigravity"|"opencode"
+---@field agent "claude"|"antigravity"|"opencode"|"opencode-v2"
 ---@field keys string[] typed one entry at a time, as with nvim_input
----@field reply "accepted"|"rejected"
+---@field reply "accepted"|"rejected"|"pending" pending: no reply was sent
+---@field extra_files integer? opencode-v2 only: more entries in metadata.files
 
 ---@param path string
 ---@return string
@@ -34,11 +35,14 @@ end
 ---@return Scenario
 local function load_scenario(dir)
   local spec = dofile(dir .. "/scenario.lua")
-  if not vim.tbl_contains({ "claude", "antigravity", "opencode" }, spec.agent) then
-    error(string.format("%s: agent %s, expected claude, antigravity or opencode", dir, vim.inspect(spec.agent)), 0)
+  if not vim.tbl_contains({ "claude", "antigravity", "opencode", "opencode-v2" }, spec.agent) then
+    error(
+      string.format("%s: agent %s, expected claude, antigravity, opencode or opencode-v2", dir, vim.inspect(spec.agent)),
+      0
+    )
   end
-  if not vim.tbl_contains({ "accepted", "rejected" }, spec.reply) then
-    error(string.format("%s: reply %s, expected accepted or rejected", dir, vim.inspect(spec.reply)), 0)
+  if not vim.tbl_contains({ "accepted", "rejected", "pending" }, spec.reply) then
+    error(string.format("%s: reply %s, expected accepted, rejected or pending", dir, vim.inspect(spec.reply)), 0)
   end
   return spec
 end
@@ -91,10 +95,11 @@ local function run_scenario(dir, deps)
   local spec = load_scenario(dir)
   local target = prepare_target(dir)
   local original = vim.fn.filereadable(target) == 1 and read_raw(target) or nil
-  local proposal = read_raw(find_file(dir, spec.agent == "opencode" and "patch" or "proposed"))
+  local proposal = read_raw(find_file(dir, spec.agent:find("^opencode") and "patch" or "proposed"))
 
   local nvim = open_session(target, deps)
-  nvim:lua("package.loaded.agent_doubles['propose_' .. select(1, ...)](select(2, ...))", spec.agent, target, proposal)
+  local propose = "propose_" .. spec.agent:gsub("-", "_")
+  nvim:lua("package.loaded.agent_doubles[select(1, ...)](select(2, ...))", propose, target, proposal, spec.extra_files)
   vim.wait(150)
   for _, keys in ipairs(spec.keys) do
     nvim:input(keys)

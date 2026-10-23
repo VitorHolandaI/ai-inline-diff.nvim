@@ -122,7 +122,83 @@ function M.propose_opencode(path, patch)
   end
 end
 
----@param agent "claude"|"antigravity"|"opencode"
+---@class FakeOpencodeV2Server
+---@field replies { session_id: string, request_id: string, choice: string }[]
+local FakeOpencodeV2Server = {}
+FakeOpencodeV2Server.__index = FakeOpencodeV2Server
+
+-- v2 replies to /api/session/{sessionID}/permission/{requestID}/reply, so a
+-- v1-style permit(id, choice) call lands here with the arguments shifted.
+---@param session_id string
+---@param request_id string
+---@param choice "once"|"always"|"reject"
+---@return { catch: fun(self, on_error: fun(err: unknown)) }
+function FakeOpencodeV2Server:permit(session_id, request_id, choice)
+  self.replies[#self.replies + 1] = { session_id = session_id, request_id = request_id, choice = choice }
+  return { catch = function() end }
+end
+
+---@param server table
+local function serve_opencode(server)
+  package.loaded["opencode.server"] = {
+    new = function()
+      local promise = {}
+      function promise:next(callback)
+        callback(server)
+        return promise
+      end
+      function promise:catch()
+        return promise
+      end
+      return promise
+    end,
+  }
+end
+
+--- OpenCode 2.x sends `{ id, type, data }` events. An edit permission carries
+--- one entry per file in data.metadata.files, each `{ file, patch, status }`
+--- (from OpenCode 2.1.4's edit, write and patch tools). The server object has
+--- no `cwd`, and the reply needs the session id.
+---@param path string
+---@param patch string unified diff for files[1]
+---@param extra_files integer? more entries in metadata.files
+function M.propose_opencode_v2(path, patch, extra_files)
+  local server = setmetatable({ replies = {} }, FakeOpencodeV2Server)
+  serve_opencode(server)
+  local files = { { file = path, patch = patch, status = "modified", additions = 1, deletions = 1 } }
+  for index = 1, extra_files or 0 do
+    files[#files + 1] = { file = path .. ".extra" .. index, patch = patch, status = "modified" }
+  end
+  require("ai_inline_diff").setup_opencode()
+  vim.api.nvim_exec_autocmds("User", {
+    pattern = "OpencodeEvent:permission.asked",
+    data = {
+      url = "http://fake-opencode",
+      event = {
+        id = "event-1",
+        type = "permission.asked",
+        data = {
+          id = "permission-1",
+          sessionID = "session-1",
+          action = "edit",
+          resources = { path },
+          metadata = { files = files },
+        },
+      },
+    },
+  })
+  local shown = review_buffer() and buffer_text(review_buffer()) or nil
+  outcome_readers["opencode-v2"] = function()
+    local last = server.replies[#server.replies]
+    local addressed = last and last.session_id == "session-1" and last.request_id == "permission-1"
+    if addressed and last.choice == "once" then
+      return { reply = "accepted", content = shown }
+    end
+    return { reply = addressed and last.choice == "reject" and "rejected" or "pending" }
+  end
+end
+
+---@param agent "claude"|"antigravity"|"opencode"|"opencode-v2"
 ---@return AgentOutcome
 function M.outcome(agent)
   return outcome_readers[agent]()

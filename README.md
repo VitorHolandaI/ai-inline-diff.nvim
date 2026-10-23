@@ -34,14 +34,14 @@ and used with these versions:
 | Neovim               | 0.12.5                           |
 | Claude Code CLI      | 2.1.282                          |
 | claudecode.nvim      | `main` at `2390c6e` (v0.3.0+53)  |
-| OpenCode CLI         | 1.18.32                          |
-| opencode.nvim        | v1.0.2                           |
+| OpenCode CLI         | 2.1.4                            |
+| opencode.nvim        | `main` at `e7643e9`              |
 | Antigravity CLI      | `agy` 1.2.14                     |
 | antigravity-cli.nvim | `main` at `43d0d38`              |
 
-opencode.nvim's `main` branch has moved to OpenCode v2, which this plugin
-has not been tried with. Pin opencode.nvim to the v1 releases
-(`version = "*"` in lazy.nvim picks v1.0.2) while you use OpenCode 1.x.
+OpenCode 2.x needs opencode.nvim's `main` branch, which has no release yet,
+so the spec below pins a commit. The plugin also still reads OpenCode 1.x
+events; for 1.x, use opencode.nvim v1.0.2 (`version = "*"`) instead.
 
 The automated tests in `tests/` load the pinned agent plugins but never
 start an agent, so the agent CLI versions above come from daily use.
@@ -80,7 +80,7 @@ return {
   },
   {
     "nickjvandyke/opencode.nvim",
-    tag = "v1.0.2",
+    commit = "e7643e9efc878876bb9c68da6cf30c45d6c34e5a",
     dependencies = { "folke/snacks.nvim", "VitorHolandaI/ai-inline-diff.nvim" },
     config = function()
       require("ai_inline_diff").setup_opencode()
@@ -122,13 +122,19 @@ The `setup_*()` calls are the same as above.
 ### OpenCode permissions
 
 OpenCode has to ask before editing, or its edits land on disk before you can
-review them. Start it with:
+review them. OpenCode 2.x runs one background server for every client and
+reads its configuration when that server starts, so an environment variable
+set on the terminal inside Neovim only applies if that terminal happens to
+start the server. Put the setting in `~/.config/opencode/opencode.jsonc`
+instead:
 
-```lua
-env = {
-  OPENCODE_CONFIG_CONTENT = '{"permission":{"edit":"ask"}}',
+```jsonc
+{
+  "permission": { "edit": "ask" }
 }
 ```
+
+OpenCode outside Neovim then asks too, in its own interface.
 
 ## Moving between the editor and agent terminals
 
@@ -162,7 +168,7 @@ terminal, so you can keep talking while you read.
 2. Each agent starts with the instruction file
    [`instructions/open-location.md`](instructions/open-location.md). Claude
    Code reads it through `--append-system-prompt-file` and OpenCode through
-   the `instructions` list in its config. The file tells the agent to run the
+   the `instructions` list in its global config. The file tells the agent to run the
    script when you ask to see code, and what to do when the script fails.
 3. The agent finds the code the way it always does, by reading and searching
    files, and then runs something like:
@@ -200,12 +206,13 @@ require("ai_inline_diff").setup_open_location()
 local instructions = require("ai_inline_diff").open_location_instructions()
 opts.terminal_cmd = "claude --append-system-prompt-file " .. vim.fn.shellescape(instructions)
 
--- opencode.nvim, in the snacks terminal env:
-OPENCODE_CONFIG_CONTENT = vim.json.encode({
-  permission = { edit = "ask" },
-  instructions = { require("ai_inline_diff").open_location_instructions() },
-}),
+-- Claude Code only. For OpenCode, add the file to
+-- ~/.config/opencode/opencode.jsonc (see OpenCode permissions above):
+--   "instructions": ["/path/to/ai-inline-diff.nvim/instructions/open-location.md"]
 ```
+
+`:lua print(require("ai_inline_diff").open_location_instructions())` prints
+that path.
 
 You can also call it from Lua:
 `require("ai_inline_diff").open_location(path, first, last)`.
@@ -263,6 +270,7 @@ nvim -l tests/scenarios_test.lua
 nvim -l tests/patch_test.lua
 nvim -l tests/claude_adapter_test.lua
 nvim -l tests/deprecated_api_test.lua
+nvim -l tests/opencode_event_test.lua
 ```
 
 `scenarios_test.lua` replays each folder in `tests/scenarios/`. A simulated

@@ -10,9 +10,10 @@ a macro would.
 A folder holds:
 
 - `scenario.lua` returns `{ agent = ..., keys = { ... }, reply = ... }`.
-  `agent` is `"claude"`, `"antigravity"` or `"opencode"`; `keys` uses
+  `agent` is `"claude"`, `"antigravity"`, `"opencode"` (1.x events) or
+  `"opencode-v2"` (2.x events, with an optional `extra_files` count); `keys` uses
   `nvim_input()` notation such as `"<M-n>"` or `"ciwfoo<Esc>"`; `reply` is
-  `"accepted"` or `"rejected"`.
+  `"accepted"`, `"rejected"` or `"pending"` (nothing may be sent).
 - `original.<ext>` is the file before the edit. Leave it out to propose a
   new file; the target is then named after `expected.<ext>`.
 - `proposed.<ext>` is the full file the agent proposes, for Claude and

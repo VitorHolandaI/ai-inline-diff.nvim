@@ -17,6 +17,12 @@ a way for an agent to show a file range in the editor.
   `open_location()`, `setup_open_location()` and
   `open_location_instructions()` only forward to `terminal.lua` and
   `location.lua`.
+- `opencode_event.lua` reads an OpenCode edit permission request from
+  either event shape, 1.x `{ type, properties }` or 2.x `{ id, type, data }`
+  with the diff in `data.metadata.files`, and answers with `permit()`, which
+  takes `(id, choice)` on 1.x and `(sessionID, id, choice)` on 2.x. It
+  returns a reason instead of an edit when a 2.x request has no diff or
+  covers several files. Only `setup_opencode()` in `init.lua` uses it.
 - `text.lua` splits file content into lines and joins it back, keeping the
   final newline and CRLF endings. `init.lua` uses it to read proposals and
   OpenCode patches, and `review_changes.lua` to diff the buffer against the
