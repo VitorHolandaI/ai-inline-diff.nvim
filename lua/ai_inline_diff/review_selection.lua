@@ -2,10 +2,12 @@ local M = {}
 
 ---@alias AiInlineDiffHunk integer[] { old_start, old_count, new_start, new_count }
 
+--- Rows a change occupies in the review buffer. A removal-only change has
+--- no rows of its own, so it reports the row it sits under.
 ---@param hunk AiInlineDiffHunk
 ---@param line_count integer
 ---@return integer first_row, integer last_row
-local function hunk_rows(hunk, line_count)
+function M.hunk_rows(hunk, line_count)
   local first = math.min(math.max(hunk[3], 1), line_count)
   if hunk[4] == 0 then
     return first, first
@@ -19,7 +21,7 @@ end
 ---@param buf integer
 ---@param hunk AiInlineDiffHunk
 function M.select_hunk(win, buf, hunk)
-  local first, last = hunk_rows(hunk, vim.api.nvim_buf_line_count(buf))
+  local first, last = M.hunk_rows(hunk, vim.api.nvim_buf_line_count(buf))
   local keys = string.format("<C-\\><C-n>%dG", first)
   if hunk[4] > 0 then
     keys = keys .. string.format("V%dGo", last)

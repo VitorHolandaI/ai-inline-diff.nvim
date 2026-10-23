@@ -219,14 +219,23 @@ mode.
 | ----------------------- | ---------------------- | ---------------------------------- |
 | `<M-a>`                 | Normal, Visual, Insert | accept the edit                    |
 | `<M-r>`                 | Normal, Visual, Insert | reject the edit                    |
+| `<M-y>`                 | Normal, Visual, Insert | keep the selected change           |
+| `<M-x>`                 | Normal, Visual, Insert | drop the selected change           |
 | `da`, `<leader>aa`      | Normal, Visual         | accept the edit                    |
 | `dr`, `q`, `<leader>ad` | Normal, Visual         | reject the edit                    |
 | `<M-n>`, `<M-p>`        | Normal, Visual, Insert | select the next or previous change |
 | `]c`, `[c`              | Normal, Visual         | select the next or previous change |
 | `:write`                | Normal                 | accept the edit                    |
 
-Accepting or rejecting always covers the whole edit, even when only one
-change is selected. You end up in Normal mode in the original buffer.
+`<M-a>` and `<M-r>` cover the whole edit, even when only one change is
+selected. To decide change by change, use `<M-y>` to keep the selected
+change and `<M-x>` to put its original lines back. Either one moves the
+selection to the next undecided change, and the review ends by itself after
+the last one: it is accepted with the changes you kept, or rejected if you
+dropped them all. `<M-a>` in the middle accepts what is left as proposed.
+Kept changes show a `✓` sign. OpenCode takes or refuses its patch as a
+whole, so in an OpenCode review `<M-y>` and `<M-x>` only show a warning.
+When the review ends you are in Normal mode in the original buffer.
 
 ### What gets reviewed
 
@@ -245,7 +254,17 @@ the agent makes by running a shell command, such as `sed -i` or
 nvim -l tests/terminal_test.lua
 nvim -l tests/location_test.lua
 nvim -l tests/review_test.lua
+nvim -l tests/scenarios_test.lua
 ```
+
+`scenarios_test.lua` replays each folder in `tests/scenarios/`. A simulated
+agent proposes an edit, the scenario's keys are typed into the review, and
+what the agent would write must match `expected.*` byte for byte. Claude
+and Antigravity edits go through the real claudecode.nvim and
+antigravity-cli.nvim, cloned at the pinned versions into `tests/.deps/` on
+the first run. OpenCode edits arrive as its permission event.
+[`tests/scenarios/README.md`](tests/scenarios/README.md) explains how to add
+a scenario.
 
 `nvim -l tests/coverage.lua` runs all of them and prints line coverage for
 each file in `lua/ai_inline_diff/`. Add `--missing` to list the lines that

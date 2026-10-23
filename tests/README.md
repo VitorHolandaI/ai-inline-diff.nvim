@@ -18,10 +18,24 @@ external test framework. Each exits with code 1 on any failed check.
 - `review_test.lua` checks what a review looks like and how it ends, through
   `setup_antigravity()` with `FakeAntigravityDiff` standing in for
   `antigravity-cli.diff` and recording the replies sent to the agent. It
-  covers the first change selected on open (`../lua/ai_inline_diff/review_selection.lua`),
-  `]c`/`[c`, and `<M-n>`, `<M-p>`, `<M-a>`, `<M-r>` and `da` from each mode
+  covers the first change selected on open
+  (`../lua/ai_inline_diff/review_selection.lua`), `]c`/`[c`, and `<M-n>`,
+  `<M-p>`, `<M-a>`, `<M-r>` and `da` from each mode
   (`../lua/ai_inline_diff/review_keys.lua`).
-
+- `scenarios_test.lua` replays each folder in `scenarios/` (see
+  `scenarios/README.md`) in its own child Neovim and compares what the agent
+  would write with the scenario's `expected.*`. Pass a folder name to run
+  only that one. It goes through two helpers:
+  - `helpers/agent_plugins.lua` pins claudecode.nvim and
+    antigravity-cli.nvim to the commits in the main README's "Versions in
+    use" and clones them into `.deps/` (git-ignored) on the first run.
+  - `helpers/agent_doubles.lua` runs inside the child and plays the agent
+    process: it calls `claudecode.diff.open_diff_blocking()` in a coroutine
+    as Claude Code's `openDiff` would, replaces
+    `antigravity-cli.server.notify` to record Antigravity's replies, and
+    fires `OpencodeEvent:permission.asked` with `FakeOpencodeServer`
+    standing in for `opencode.server`. `outcome()` reports what the agent
+    would receive.
 - `coverage.lua` runs every `*_test.lua` with `AI_INLINE_DIFF_COVERAGE_DIR`
   set. `helpers/embedded_nvim.lua` sees the variable and loads
   `helpers/coverage_hook.lua` into each child, which counts the plugin lines
@@ -39,5 +53,6 @@ Run from the repository root:
 nvim -l tests/terminal_test.lua
 nvim -l tests/location_test.lua
 nvim -l tests/review_test.lua
+nvim -l tests/scenarios_test.lua
 nvim -l tests/coverage.lua --missing
 ```

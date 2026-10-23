@@ -3,3 +3,4 @@
 *.swo
 *~
 .ai-memory.toml
+tests/.deps/

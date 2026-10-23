@@ -3,6 +3,8 @@ local M = {}
 ---@class AiInlineDiffReviewActions
 ---@field accept fun()
 ---@field reject fun()
+---@field keep_change fun()
+---@field drop_change fun()
 ---@field next_change fun()
 ---@field previous_change fun()
 
@@ -27,7 +29,7 @@ local function from_any_mode(action)
 end
 
 --- Map the keys that resolve and navigate a review in its buffer.
---- Example: `map(buf, { accept = a, reject = r, next_change = n, previous_change = p })`
+--- Example: `map(buf, { accept = a, reject = r, keep_change = k, ... })`
 ---@param buf integer
 ---@param actions AiInlineDiffReviewActions
 function M.map(buf, actions)
@@ -43,6 +45,8 @@ function M.map(buf, actions)
     { { "n", "x" }, "<leader>ad", reject, "Reject AI edit" },
     { { "n", "x", "i" }, "<M-a>", accept, "Accept AI edit" },
     { { "n", "x", "i" }, "<M-r>", reject, "Reject AI edit" },
+    { { "n", "x", "i" }, "<M-y>", from_any_mode(actions.keep_change), "Keep this AI change" },
+    { { "n", "x", "i" }, "<M-x>", from_any_mode(actions.drop_change), "Drop this AI change" },
     { { "n", "x" }, "]c", actions.next_change, "Next AI change" },
     { { "n", "x" }, "[c", actions.previous_change, "Previous AI change" },
     -- No leave_insert_and_visual(): the selection starts with <C-\><C-n>.

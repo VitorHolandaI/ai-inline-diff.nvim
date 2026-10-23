@@ -1,6 +1,5 @@
 local M = {}
 
-local namespace = vim.api.nvim_create_namespace("AiInlineDiff")
 local reviews = {}
 local current_review
 local resolved_opencode_permissions = {}
@@ -9,27 +8,11 @@ local canonical_path = require("ai_inline_diff.paths").canonical_path
 local find_editor_window = require("ai_inline_diff.windows").find_editor_window
 local review_keys = require("ai_inline_diff.review_keys")
 local review_selection = require("ai_inline_diff.review_selection")
+local review_changes = require("ai_inline_diff.review_changes")
+local text = require("ai_inline_diff.text")
 
-local function split_text(text)
-  local line_ending = text:find("\r\n", 1, true) and "\r\n" or "\n"
-  text = text:gsub("\r\n", "\n")
-  if text == "" then
-    return {}, false, line_ending
-  end
-
-  local has_eol = text:sub(-1) == "\n"
-  local lines = vim.split(text, "\n", { plain = true })
-  if has_eol then
-    table.remove(lines)
-  end
-  return lines, has_eol, line_ending
-end
-
-local function join_lines(lines, has_eol, line_ending)
-  line_ending = line_ending or "\n"
-  local text = table.concat(lines, line_ending)
-  return has_eol and (text .. line_ending) or text
-end
+local split_text = text.split
+local join_lines = text.join
 
 local function read_file(path)
   local file, err = io.open(path, "rb")
@@ -154,48 +137,6 @@ local function resolve_review(id, accepted, invoke_callback)
   return true
 end
 
-local function render_hunks(review, old_lines, new_lines)
-  for _, hunk in ipairs(review.hunks) do
-    local old_start, old_count, new_start, new_count = unpack(hunk)
-
-    if old_count > 0 then
-      local virtual_lines = {}
-      for index = old_start, old_start + old_count - 1 do
-        virtual_lines[#virtual_lines + 1] = {
-          { "- ", "DiffDelete" },
-          { old_lines[index] or "", "DiffDelete" },
-        }
-      end
-
-      local row
-      local above
-      if new_count > 0 or new_start == 0 then
-        row = math.max(new_start - 1, 0)
-        above = true
-      else
-        row = math.max(new_start - 1, 0)
-        above = false
-      end
-
-      vim.api.nvim_buf_set_extmark(review.buf, namespace, row, 0, {
-        strict = false,
-        virt_lines = virtual_lines,
-        virt_lines_above = above,
-      })
-    end
-
-    for index = new_start, new_start + new_count - 1 do
-      if index >= 1 and index <= #new_lines then
-        vim.api.nvim_buf_set_extmark(review.buf, namespace, index - 1, 0, {
-          line_hl_group = "DiffAdd",
-          sign_text = "+",
-          sign_hl_group = "DiffAdd",
-        })
-      end
-    end
-  end
-end
-
 local function open_review(opts)
   if current_review and reviews[current_review] then
     resolve_review(current_review, false)
@@ -252,6 +193,7 @@ local function open_review(opts)
     previous_cursor = vim.api.nvim_win_get_cursor(win),
     previous_signcolumn = vim.wo[win].signcolumn,
     original_text = opts.old_text,
+    editable = opts.editable ~= false,
     target_buf = find_loaded_buffer(opts.path),
     on_accept = opts.on_accept,
     on_reject = opts.on_reject,
@@ -263,7 +205,7 @@ local function open_review(opts)
 
   vim.api.nvim_win_set_buf(win, buf)
   vim.wo[win].signcolumn = "yes"
-  render_hunks(review, old_lines, new_lines)
+  review_changes.render(review)
 
   vim.api.nvim_set_current_win(win)
   if hunks[1] then
@@ -277,9 +219,16 @@ local function open_review(opts)
     resolve_review(opts.id, false)
   end
 
+  local resolvers = { accept = accept, reject = reject }
   review_keys.map(buf, {
     accept = accept,
     reject = reject,
+    keep_change = function()
+      review_changes.keep_selected(review, resolvers)
+    end,
+    drop_change = function()
+      review_changes.drop_selected(review, resolvers)
+    end,
     next_change = function()
       review_selection.select_adjacent(review, "next")
     end,
@@ -302,7 +251,7 @@ local function open_review(opts)
     end,
   })
 
-  vim.notify("AI edit: <M-a> accept, <M-r> reject, <M-n>/<M-p> next/previous change", vim.log.levels.INFO)
+  vim.notify("AI edit: <M-a>/<M-r> accept/reject all, <M-y>/<M-x> keep/drop change, <M-n>/<M-p> move", vim.log.levels.INFO)
   return review
 end
 

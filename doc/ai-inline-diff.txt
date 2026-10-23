@@ -95,6 +95,11 @@ leaves you in Normal mode.
 
 ALT-A                     Accept the edit. Normal, Visual and Insert mode.
 ALT-R                     Reject the edit. Normal, Visual and Insert mode.
+ALT-Y                     Keep the selected change and select the next
+                          undecided one. Normal, Visual and Insert mode.
+ALT-X                     Put the original lines back for the selected
+                          change and select the next undecided one. Normal,
+                          Visual and Insert mode.
 da                        Accept the edit. Normal and Visual mode.
 dr                        Reject the edit. Normal and Visual mode.
 q                         Reject the edit. Normal and Visual mode.
@@ -107,6 +112,11 @@ ALT-P                     Select the previous change. Normal, Visual and
 ]c                        Select the next change.
 [c                        Select the previous change.
 :write                    Accept the edit.
+
+After ALT-Y or ALT-X on the last undecided change the review ends by
+itself: it is accepted with the kept changes, or rejected when every change
+was dropped. Kept changes show a "✓" sign. OpenCode reviews are read-only,
+so ALT-Y and ALT-X only show a warning there.
 
 Only edits that the agent sends to Neovim for approval are reviewed. An
 edit made by a shell command, such as `sed -i`, goes straight to disk.
@@ -285,6 +295,10 @@ lua/ai_inline_diff/review_selection.lua
     Selecting a change when a review opens and on ]c and [c.
 lua/ai_inline_diff/review_keys.lua
     Mappings of the review buffer.
+lua/ai_inline_diff/review_changes.lua
+    Drawing changes, and keeping or dropping one change at a time.
+lua/ai_inline_diff/text.lua
+    Splitting and joining file content.
 lua/ai_inline_diff/terminal.lua
     Terminal focus and navigation.
 lua/ai_inline_diff/location.lua
