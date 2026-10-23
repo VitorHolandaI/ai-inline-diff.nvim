@@ -207,7 +207,7 @@ local function test_key_hint_lasts_a_minute_and_fits_the_agent()
   propose(nvim, path, edited_text({ [3] = "three" }))
   local editable = nvim:lua("return _G.hints[#_G.hints]") or {}
   check("editable review hint lasts 60 s", editable.timeout, 60000)
-  check("editable review hint lists <M-y>/<M-x>", tostring(editable.message):find("<M-y>", 1, true) ~= nil, true)
+  check("editable review hint lists Alt-y/Alt-x", tostring(editable.message):find("Alt-y", 1, true) ~= nil, true)
   nvim:input("<M-r>")
 
   nvim:lua("package.loaded.agent_doubles = dofile(...)", plugin_root .. "/tests/helpers/agent_doubles.lua")
@@ -219,8 +219,8 @@ local function test_key_hint_lasts_a_minute_and_fits_the_agent()
   vim.wait(150)
   local read_only = nvim:lua("return _G.hints[#_G.hints]") or {}
   check("OpenCode review hint lasts 60 s", read_only.timeout, 60000)
-  check("OpenCode review hint leaves out <M-y>/<M-x>", tostring(read_only.message):find("<M-y>", 1, true), nil)
-  check("OpenCode review hint keeps <M-a>", tostring(read_only.message):find("<M-a>", 1, true) ~= nil, true)
+  check("OpenCode review hint leaves out Alt-y/Alt-x", tostring(read_only.message):find("Alt-y", 1, true), nil)
+  check("OpenCode review hint keeps Alt-a", tostring(read_only.message):find("Alt-a", 1, true) ~= nil, true)
   nvim:stop()
 end
 

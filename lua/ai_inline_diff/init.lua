@@ -264,8 +264,8 @@ local function open_review(opts)
   -- leaves out the per-change keys. It stays a minute: the default few
   -- seconds were gone before the keys could be read.
   local hint = review.editable
-      and "AI edit: <M-n>/<M-p> move, <M-y>/<M-x> keep/drop this change, <M-a>/<M-r> accept/reject all"
-    or "AI edit: <M-n>/<M-p> move between changes, <M-a> accept all, <M-r> reject all"
+      and "AI edit: Alt-n/Alt-p move, Alt-y/Alt-x keep/drop this change, Alt-a/Alt-r accept/reject all"
+    or "AI edit: Alt-n/Alt-p move between changes, Alt-a accept all, Alt-r reject all"
   vim.notify(hint, vim.log.levels.INFO, { title = "ai-inline-diff", timeout = 60000 })
   return review
 end

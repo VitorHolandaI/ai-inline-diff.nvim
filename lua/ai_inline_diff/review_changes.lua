@@ -160,7 +160,7 @@ end
 ---@return AiInlineDiffHunk?
 local function editable_selected_hunk(review)
   if not review.editable then
-    vim.notify("This agent only takes the whole edit: <M-a> accepts, <M-r> rejects", vim.log.levels.WARN)
+    vim.notify("This agent only takes the whole edit: Alt-a accepts, Alt-r rejects", vim.log.levels.WARN)
     return nil
   end
   return selected_hunk(review)

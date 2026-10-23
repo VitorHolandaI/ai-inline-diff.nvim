@@ -246,6 +246,9 @@ minute.
 | `]c`, `[c`              | Normal, Visual         | select the next or previous change |
 | `:write`                | Normal                 | accept the edit                    |
 
+`<M-a>` is Vim's notation for Alt-a, and the same goes for the other `<M-…>`
+keys; the in-editor hint spells them as `Alt-a`.
+
 `<M-a>` and `<M-r>` cover the whole edit, even when only one change is
 selected. To decide change by change, use `<M-y>` to keep the selected
 change and `<M-x>` to put its original lines back. Either one moves the
