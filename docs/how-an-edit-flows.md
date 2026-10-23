@@ -2,8 +2,8 @@
 
 This page follows one edit from the moment an agent proposes it to the
 moment the file changes on disk, with the code that runs at each step. Line
-numbers refer to `v0.1.0-rc.3`; they drift as the code changes, but the
-function names do not.
+numbers are from `v0.1.0-rc.3` and will drift as the code changes, so
+search by function name if one looks off.
 
 ## The example
 
@@ -66,7 +66,7 @@ end
 The coroutine stops at `coroutine.yield()`. Claude keeps waiting until one
 of the callbacks resumes it.
 
-OpenCode sends a patch, not the full file. It arrives as the
+OpenCode sends a patch instead of the full file. It arrives as the
 `OpencodeEvent:permission.asked` autocmd, and the plugin rebuilds the
 proposed file from the patch before it opens the review
 (`init.lua:552`):
@@ -188,22 +188,20 @@ end
 `get_buffer_text()` (`init.lua:71`) joins the lines with the file's own
 line ending (LF or CRLF) and keeps or drops the final newline to match.
 
-## 6. Someone writes the file
+## 6. The file gets written
 
-Who writes depends on the agent.
-
-Claude Code writes it. The accept callback resumes the waiting coroutine
-with `FILE_SAVED` and the final text (`claude_result()`, `init.lua:611`):
+Which side writes the file depends on the agent. For Claude Code, the
+accept callback resumes the waiting coroutine with `FILE_SAVED` and the
+final text (`claude_result()`, `init.lua:611`):
 
 ```lua
 return { content = { { type = "text", text = "FILE_SAVED" }, { type = "text", text = content } } }
 ```
 
-This is the same reply claudecode.nvim's own diff view sends
-(`claudecode/diff.lua`): `FILE_SAVED` followed by the buffer text, so hand
-edits made in the review travel with it. Neovim does not touch the file in
-this case; Claude Code writes it after the reply arrives. If you rejected,
-Claude gets `DIFF_REJECTED` instead.
+claudecode.nvim's own diff view sends the same reply
+(`claudecode/diff.lua`), so hand edits made in the review travel with the
+text. Neovim leaves the file alone here and Claude Code writes it once the
+reply arrives. A rejection sends `DIFF_REJECTED` instead.
 
 Antigravity's accept callback writes the file from Neovim
 (`init.lua:840`). It puts the text into the file's buffer, runs
