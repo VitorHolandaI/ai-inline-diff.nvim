@@ -191,7 +191,41 @@ local function test_da_in_visual_accepts_instead_of_deleting()
   nvim:stop()
 end
 
+-- The key hint stays up for a minute and lists only keys that work for the
+-- agent: OpenCode takes or refuses its whole patch, so no <M-y>/<M-x>.
+local function test_key_hint_lasts_a_minute_and_fits_the_agent()
+  local path = write_original_file()
+  local nvim = open_session(path)
+  nvim:lua([[
+    _G.hints = {}
+    vim.notify = function(message, _, opts)
+      if tostring(message):find("^AI edit") then
+        table.insert(_G.hints, { message = message, timeout = opts and opts.timeout })
+      end
+    end
+  ]])
+  propose(nvim, path, edited_text({ [3] = "three" }))
+  local editable = nvim:lua("return _G.hints[#_G.hints]") or {}
+  check("editable review hint lasts 60 s", editable.timeout, 60000)
+  check("editable review hint lists <M-y>/<M-x>", tostring(editable.message):find("<M-y>", 1, true) ~= nil, true)
+  nvim:input("<M-r>")
+
+  nvim:lua("package.loaded.agent_doubles = dofile(...)", plugin_root .. "/tests/helpers/agent_doubles.lua")
+  nvim:lua(
+    "package.loaded.agent_doubles.propose_opencode_v2(...)",
+    path,
+    "Index: x\n" .. string.rep("=", 67) .. "\n--- x\n+++ x\n@@ -3 +3 @@\n-line 3\n+three\n"
+  )
+  vim.wait(150)
+  local read_only = nvim:lua("return _G.hints[#_G.hints]") or {}
+  check("OpenCode review hint lasts 60 s", read_only.timeout, 60000)
+  check("OpenCode review hint leaves out <M-y>/<M-x>", tostring(read_only.message):find("<M-y>", 1, true), nil)
+  check("OpenCode review hint keeps <M-a>", tostring(read_only.message):find("<M-a>", 1, true) ~= nil, true)
+  nvim:stop()
+end
+
 test_opens_with_first_change_selected()
+test_key_hint_lasts_a_minute_and_fits_the_agent()
 test_navigation_selects_each_change()
 test_alt_n_and_alt_p_step_from_each_mode()
 test_removal_only_change_places_cursor()

@@ -229,7 +229,9 @@ You can also call it from Lua:
 When a review opens, the editor window takes focus and the first change is
 selected in linewise Visual mode, showing which lines the agent wants to
 write. A change that only removes lines has nothing to select, so the
-cursor goes to where the lines were and you stay in Normal mode.
+cursor goes to where the lines were and you stay in Normal mode. A
+notification lists the keys that work for that agent and stays up for a
+minute.
 
 | Keys                    | Modes                  | Action                             |
 | ----------------------- | ---------------------- | ---------------------------------- |

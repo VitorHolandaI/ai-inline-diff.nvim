@@ -97,7 +97,8 @@ Two more setup functions are independent of the review:
 
 When a review opens, its window takes focus and the first change is
 selected in linewise Visual mode. A change that only removes lines has
-nothing to select; the cursor goes to that row in Normal mode.
+nothing to select; the cursor goes to that row in Normal mode. A
+notification lists the keys that work for that agent for 60 seconds.
 
 The following mappings are local to an active inline review buffer. The
 ones that accept or reject act on the whole edit, even when a single change
