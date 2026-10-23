@@ -19,6 +19,30 @@ the agents directly; it hooks into their plugins.
 | OpenCode    | [nickjvandyke/opencode.nvim](https://github.com/nickjvandyke/opencode.nvim)             | `setup_opencode()`    |
 | Antigravity | [McEazy2700/antigravity-cli.nvim](https://github.com/McEazy2700/antigravity-cli.nvim)   | `setup_antigravity()` |
 
+### Versions in use
+
+The plugin replaces internal functions of the agent plugins and listens to
+their events, so a new release of any of them can break it. It is developed
+and used with these versions:
+
+| Component            | Version                          |
+| -------------------- | -------------------------------- |
+| Neovim               | 0.12.5                           |
+| Claude Code CLI      | 2.1.282                          |
+| claudecode.nvim      | `main` at `2390c6e` (v0.3.0+53)  |
+| OpenCode CLI         | 1.18.32                          |
+| opencode.nvim        | v1.0.2                           |
+| Antigravity CLI      | `agy` 1.2.14                     |
+| antigravity-cli.nvim | `main` at `43d0d38`              |
+
+opencode.nvim's `main` branch has moved to OpenCode v2, which this plugin
+has not been tried with. Pin opencode.nvim to the v1 releases
+(`version = "*"` in lazy.nvim picks v1.0.2) while you use OpenCode 1.x.
+
+The automated tests in `tests/` run the review, terminal and location code
+in Neovim alone and never start an agent. The agent versions above come from
+daily use.
+
 ## Installation
 
 ### lazy.nvim
@@ -27,10 +51,16 @@ Add this to your plugin specs and keep only the agents you use. Each
 `setup_*()` call goes in the agent plugin's own `config`, after that plugin's
 `setup()`.
 
+`version = "*"` installs the latest release of this plugin. The `commit` and
+`tag` lines pin each agent plugin to the version in
+[Versions in use](#versions-in-use). Drop them to follow the agent plugins'
+latest code at your own risk.
+
 ```lua
 return {
   {
     "VitorHolandaI/ai-inline-diff.nvim",
+    version = "*",
     lazy = false,
     config = function()
       require("ai_inline_diff").setup_terminal()
@@ -38,6 +68,7 @@ return {
   },
   {
     "coder/claudecode.nvim",
+    commit = "2390c6e45c4789072c293ac69de051d169668b29",
     dependencies = { "folke/snacks.nvim", "VitorHolandaI/ai-inline-diff.nvim" },
     config = function(_, opts)
       require("claudecode").setup(opts)
@@ -46,6 +77,7 @@ return {
   },
   {
     "nickjvandyke/opencode.nvim",
+    tag = "v1.0.2",
     dependencies = { "folke/snacks.nvim", "VitorHolandaI/ai-inline-diff.nvim" },
     config = function()
       require("ai_inline_diff").setup_opencode()
@@ -53,6 +85,7 @@ return {
   },
   {
     "McEazy2700/antigravity-cli.nvim",
+    commit = "43d0d38c325ec45da1f6591f1e5534fad9a0fc40",
     dependencies = { "folke/snacks.nvim", "VitorHolandaI/ai-inline-diff.nvim" },
     config = function(_, opts)
       require("antigravity-cli").setup(opts)
@@ -174,11 +207,35 @@ OPENCODE_CONFIG_CONTENT = vim.json.encode({
 You can also call it from Lua:
 `require("ai_inline_diff").open_location(path, first, last)`.
 
-## Review mappings
+## Reviewing an edit
 
-- `da` or `<leader>aa` accepts the edit, and so does `:write`.
-- `dr`, `q`, or `<leader>ad` rejects it.
-- `[c` and `]c` jump between changes.
+When a review opens, the editor window takes focus and the first change is
+selected in linewise Visual mode, showing which lines the agent wants to
+write. A change that only removes lines has nothing to
+select, so the cursor goes to where the lines were and you stay in Normal
+mode.
+
+| Keys                    | Modes                  | Action                             |
+| ----------------------- | ---------------------- | ---------------------------------- |
+| `<M-a>`                 | Normal, Visual, Insert | accept the edit                    |
+| `<M-r>`                 | Normal, Visual, Insert | reject the edit                    |
+| `da`, `<leader>aa`      | Normal, Visual         | accept the edit                    |
+| `dr`, `q`, `<leader>ad` | Normal, Visual         | reject the edit                    |
+| `<M-n>`, `<M-p>`        | Normal, Visual, Insert | select the next or previous change |
+| `]c`, `[c`              | Normal, Visual         | select the next or previous change |
+| `:write`                | Normal                 | accept the edit                    |
+
+Accepting or rejecting always covers the whole edit, even when only one
+change is selected. You end up in Normal mode in the original buffer.
+
+### What gets reviewed
+
+The plugin only sees edits that the agent sends to Neovim for approval.
+With Claude Code that is an `openDiff` request, with OpenCode an `edit`
+permission request, and with Antigravity a diff it opens. An edit
+the agent makes by running a shell command, such as `sed -i` or
+`echo >> file`, goes straight to disk and never shows up as a review. Neovim's
+`'autoread'`, on by default, reloads the buffer once it notices the change.
 
 `:help ai` covers usage, safety checks, and troubleshooting.
 
@@ -187,4 +244,9 @@ You can also call it from Lua:
 ```sh
 nvim -l tests/terminal_test.lua
 nvim -l tests/location_test.lua
+nvim -l tests/review_test.lua
 ```
+
+`nvim -l tests/coverage.lua` runs all of them and prints line coverage for
+each file in `lua/ai_inline_diff/`. Add `--missing` to list the lines that
+never ran.

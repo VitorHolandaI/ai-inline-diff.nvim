@@ -1,6 +1,9 @@
 -- Child Neovim driven over RPC. Terminal mode and window focus cannot be
 -- exercised with feedkeys inside a single headless instance.
 
+-- Set by tests/coverage.lua; each child then records which plugin lines run.
+local coverage_dir = os.getenv("AI_INLINE_DIFF_COVERAGE_DIR")
+
 ---@class EmbeddedNvim
 ---@field chan integer
 local EmbeddedNvim = {}
@@ -15,6 +18,13 @@ function EmbeddedNvim.start(plugin_root)
   end
   local self = setmetatable({ chan = chan }, EmbeddedNvim)
   self:lua("vim.opt.rtp:prepend(...)", plugin_root)
+  if coverage_dir then
+    self:lua(
+      "local hook, prefix = ...; package.loaded.coverage_hook = dofile(hook); package.loaded.coverage_hook.start(prefix)",
+      plugin_root .. "/tests/helpers/coverage_hook.lua",
+      plugin_root .. "/lua/"
+    )
+  end
   return self
 end
 
@@ -39,6 +49,9 @@ function EmbeddedNvim:focus()
 end
 
 function EmbeddedNvim:stop()
+  if coverage_dir then
+    self:lua("package.loaded.coverage_hook.dump(...)", coverage_dir)
+  end
   vim.fn.jobstop(self.chan)
 end
 

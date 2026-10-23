@@ -7,6 +7,8 @@ local resolved_opencode_permissions = {}
 
 local canonical_path = require("ai_inline_diff.paths").canonical_path
 local find_editor_window = require("ai_inline_diff.windows").find_editor_window
+local review_keys = require("ai_inline_diff.review_keys")
+local review_selection = require("ai_inline_diff.review_selection")
 
 local function split_text(text)
   local line_ending = text:find("\r\n", 1, true) and "\r\n" or "\n"
@@ -152,37 +154,6 @@ local function resolve_review(id, accepted, invoke_callback)
   return true
 end
 
-local function navigate(review, direction)
-  if not vim.api.nvim_win_is_valid(review.win) or #review.hunks == 0 then
-    return
-  end
-
-  local row = vim.api.nvim_win_get_cursor(review.win)[1]
-  local target
-  if direction == "next" then
-    for _, hunk in ipairs(review.hunks) do
-      local hunk_row = math.max(hunk[3], 1)
-      if hunk_row > row then
-        target = hunk_row
-        break
-      end
-    end
-    target = target or math.max(review.hunks[1][3], 1)
-  else
-    for index = #review.hunks, 1, -1 do
-      local hunk_row = math.max(review.hunks[index][3], 1)
-      if hunk_row < row then
-        target = hunk_row
-        break
-      end
-    end
-    target = target or math.max(review.hunks[#review.hunks][3], 1)
-  end
-
-  local line_count = vim.api.nvim_buf_line_count(review.buf)
-  vim.api.nvim_win_set_cursor(review.win, { math.min(target, line_count), 0 })
-end
-
 local function render_hunks(review, old_lines, new_lines)
   for _, hunk in ipairs(review.hunks) do
     local old_start, old_count, new_start, new_count = unpack(hunk)
@@ -294,11 +265,10 @@ local function open_review(opts)
   vim.wo[win].signcolumn = "yes"
   render_hunks(review, old_lines, new_lines)
 
-  local first_hunk = hunks[1]
-  if first_hunk then
-    vim.api.nvim_win_set_cursor(win, { math.min(math.max(first_hunk[3], 1), vim.api.nvim_buf_line_count(buf)), 0 })
-  end
   vim.api.nvim_set_current_win(win)
+  if hunks[1] then
+    review_selection.select_hunk(win, buf, hunks[1])
+  end
 
   local function accept()
     resolve_review(opts.id, true)
@@ -307,17 +277,16 @@ local function open_review(opts)
     resolve_review(opts.id, false)
   end
 
-  vim.keymap.set("n", "da", accept, { buffer = buf, desc = "Accept AI edit" })
-  vim.keymap.set("n", "dr", reject, { buffer = buf, desc = "Reject AI edit" })
-  vim.keymap.set("n", "q", reject, { buffer = buf, desc = "Reject AI edit" })
-  vim.keymap.set("n", "]c", function()
-    navigate(review, "next")
-  end, { buffer = buf, desc = "Next AI change" })
-  vim.keymap.set("n", "[c", function()
-    navigate(review, "previous")
-  end, { buffer = buf, desc = "Previous AI change" })
-  vim.keymap.set("n", "<leader>aa", accept, { buffer = buf, desc = "Accept AI edit" })
-  vim.keymap.set("n", "<leader>ad", reject, { buffer = buf, desc = "Reject AI edit" })
+  review_keys.map(buf, {
+    accept = accept,
+    reject = reject,
+    next_change = function()
+      review_selection.select_adjacent(review, "next")
+    end,
+    previous_change = function()
+      review_selection.select_adjacent(review, "previous")
+    end,
+  })
 
   vim.api.nvim_create_autocmd("BufWriteCmd", {
     buffer = buf,
@@ -333,7 +302,7 @@ local function open_review(opts)
     end,
   })
 
-  vim.notify("AI edit: da accept, dr/q reject, [c/]c navigate", vim.log.levels.INFO)
+  vim.notify("AI edit: <M-a> accept, <M-r> reject, <M-n>/<M-p> next/previous change", vim.log.levels.INFO)
   return review
 end
 

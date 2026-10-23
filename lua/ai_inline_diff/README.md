@@ -12,9 +12,22 @@ a way for an agent to show a file range in the editor.
   `setup_claude()` replaces `claudecode.diff` functions, `setup_opencode()`
   listens to the `OpencodeEvent:permission.*` autocmds and answers through
   `opencode.server`, and `setup_antigravity()` replaces
-  `antigravity-cli.diff`. `setup_terminal()`, `open_location()`,
+  `antigravity-cli.diff`. `open_review()` hands the review buffer to
+  `review_selection.lua` and `review_keys.lua`. `setup_terminal()`, `open_location()`,
   `setup_open_location()` and `open_location_instructions()` only forward to
   `terminal.lua` and `location.lua`.
+- `review_selection.lua` moves the cursor inside a review. `select_hunk()`
+  selects a change's proposed lines in linewise Visual mode, and
+  `select_adjacent()` does the same for the change after or before the
+  cursor. `init.lua` calls the first when a review opens and the second from
+  `]c`/`[c` and `<M-n>`/`<M-p>`. It reads the hunks `vim.diff()` produced in `init.lua` and
+  nothing else.
+- `review_keys.lua` sets the buffer-local maps of a review: `da`, `dr`, `q`,
+  `<leader>aa/ad` and `]c`/`[c` in Normal and Visual mode, and
+  `<M-a>`/`<M-r>`/`<M-n>`/`<M-p>` in Normal, Visual and Insert mode.
+  `open_review()` passes it the accept, reject and navigation functions, so
+  it never touches review state. Before accepting or rejecting it leaves
+  Insert or Visual mode.
 - `windows.lua` decides which window a file should appear in:
   `find_editor_window()` prefers a window already showing the file, then the
   current or nearest window that is not a terminal, float or sidebar.
