@@ -6,9 +6,8 @@ are already editing in, instead of a side-by-side diff or a new tab.
 This is a personal plugin, built for one workflow: Claude Code, OpenCode and
 Antigravity running in terminals inside Neovim, on the versions listed under
 [Versions in use](#versions-in-use). It is public in case it helps someone
-with a similar setup, but it is not a general-purpose plugin. Keys,
-behavior and supported versions change whenever that workflow does, and
-other setups are not tested.
+with a similar setup. Keys, behavior and supported versions change whenever
+that workflow does, and other setups are not tested.
 
 Removed lines show up as `DiffDelete` virtual lines and proposed lines are
 highlighted with `DiffAdd`. You can edit Claude and Antigravity proposals
