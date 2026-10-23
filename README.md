@@ -253,6 +253,20 @@ Kept changes show a `✓` sign. OpenCode takes or refuses its patch as a
 whole, so in an OpenCode review `<M-y>` and `<M-x>` only show a warning.
 When the review ends you are in Normal mode in the original buffer.
 
+### Files with unsaved changes
+
+When the agent wants to edit a file you have open with unsaved changes, the
+review waits instead of throwing your typing away. The window showing the
+file gets a notice, `AI edit waiting: save with :w to review it, or :e! to
+discard your changes`, and the review opens on its own once you save,
+discard with `:e!`, or undo back to the saved text. Answering the agent in
+its own terminal stops the wait.
+
+The review then compares what is on disk with what the agent will write.
+Claude Code and OpenCode write the content they prepared when they asked,
+so anything you saved in the meantime, including changes made by a
+format-on-save hook, shows up as lines the edit would revert.
+
 ### What gets reviewed
 
 The plugin only sees edits that the agent sends to Neovim for approval.
@@ -278,6 +292,7 @@ nvim -l tests/patch_test.lua
 nvim -l tests/claude_adapter_test.lua
 nvim -l tests/deprecated_api_test.lua
 nvim -l tests/opencode_event_test.lua
+nvim -l tests/save_wait_test.lua
 ```
 
 `scenarios_test.lua` replays each folder in `tests/scenarios/`. A simulated

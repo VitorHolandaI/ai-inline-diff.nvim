@@ -15,6 +15,10 @@ A folder holds:
   `keys` uses
   `nvim_input()` notation such as `"<M-n>"` or `"ciwfoo<Esc>"`; `reply` is
   `"accepted"`, `"rejected"` or `"pending"` (nothing may be sent).
+- `unsaved_lines` (optional, in `scenario.lua`) replaces the buffer's
+  text before the agent proposes, without saving, to play a user who is
+  still typing. Keys such as `"<C-h>"`, `":w<CR>"` or `":e!<CR>"` then
+  move to the file and save or discard it.
 - `original.<ext>` is the file before the edit. Leave it out to propose a
   new file; the target is then named after `expected.<ext>`.
 - `proposed.<ext>` is the full file the agent proposes, for Claude and
@@ -24,6 +28,8 @@ A folder holds:
 - `expected.<ext>` is the exact content the agent writes when the reply is
   `"accepted"`. Rejected scenarios have none; the runner checks the file is
   unchanged.
+- `disk.<ext>` (optional) is what the file on disk must hold at the end
+  when the keys saved it, instead of the original.
 
 To add a scenario, copy the closest folder, change the files, and run
 `nvim -l tests/scenarios_test.lua <folder>`. Write `expected.<ext>` by hand

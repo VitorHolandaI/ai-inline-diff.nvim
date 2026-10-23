@@ -3,6 +3,12 @@ local M = {}
 local reviews = {}
 local current_review
 local resolved_opencode_permissions = {}
+-- Cancels for OpenCode edits waiting on a buffer with unsaved changes.
+local opencode_save_waits = {}
+-- Cancels for Claude edits waiting the same way, keyed by diff tab name.
+local claude_save_waits = {}
+-- And for Antigravity edits, keyed by resolved file path.
+local antigravity_save_waits = {}
 
 local canonical_path = require("ai_inline_diff.paths").canonical_path
 local find_editor_window = require("ai_inline_diff.windows").find_editor_window
@@ -11,6 +17,7 @@ local review_selection = require("ai_inline_diff.review_selection")
 local review_changes = require("ai_inline_diff.review_changes")
 local text = require("ai_inline_diff.text")
 local opencode_event = require("ai_inline_diff.opencode_event")
+local save_wait = require("ai_inline_diff.save_wait")
 
 local split_text = text.split
 local join_lines = text.join
@@ -494,6 +501,10 @@ function M.setup_opencode()
       if event.type == "permission.replied" then
         local key = opencode_permission_key(args.data.url, opencode_event.replied_request_id(event))
         resolved_opencode_permissions[key] = true
+        if opencode_save_waits[key] then
+          opencode_save_waits[key]()
+          opencode_save_waits[key] = nil
+        end
         resolve_review("opencode:" .. key, false, false)
         vim.defer_fn(function()
           resolved_opencode_permissions[key] = nil
@@ -548,15 +559,11 @@ function M.setup_opencode()
 
         -- OpenCode 2.x servers have no cwd; resolve_path then tries Neovim's.
         local path = resolve_path(edit.filepath, server.cwd)
-        local loaded_buf = find_loaded_buffer(path)
-        if loaded_buf and vim.bo[loaded_buf].modified then
-          vim.notify("OpenCode edit rejected: the target buffer has unsaved changes", vim.log.levels.ERROR)
-          reject_with_retry()
-          return
-        end
-
-        local original = read_file(path) or ""
-        local proposed, patch_err = M.apply_unified_patch(original, edit.diff)
+        -- OpenCode writes the content it computed when it asked, from the file
+        -- as it was then; edits saved while the review waits get overwritten.
+        -- So the proposal comes from that file, and the review compares it
+        -- with what is on disk once the buffer is saved.
+        local proposed, patch_err = M.apply_unified_patch(read_file(path) or "", edit.diff)
         if not proposed then
           vim.notify(
             "OpenCode diff could not be rendered; answer the pending permission in its terminal: " .. patch_err,
@@ -565,39 +572,56 @@ function M.setup_opencode()
           return
         end
 
-        local function show_review()
-          if resolved_opencode_permissions[permission_key] then
-            return
-          end
-          if current_review and current_review ~= id then
-            vim.notify("OpenCode edit rejected because another AI review is active", vim.log.levels.WARN)
-            reject_with_retry()
-            return
-          end
+        local function review_from_disk()
+          local original = read_file(path) or ""
 
-          local function reply(choice)
-            submit_reply(choice, show_review)
-          end
+          local function show_review()
+            if resolved_opencode_permissions[permission_key] then
+              return
+            end
+            if current_review and current_review ~= id then
+              vim.notify("OpenCode edit rejected because another AI review is active", vim.log.levels.WARN)
+              reject_with_retry()
+              return
+            end
 
-          local _, open_err = open_review({
-            id = id,
-            path = path,
-            old_text = original,
-            new_text = proposed,
-            editable = false,
-            on_accept = function()
-              reply("once")
-            end,
-            on_reject = function()
+            local function reply(choice)
+              submit_reply(choice, show_review)
+            end
+
+            local _, open_err = open_review({
+              id = id,
+              path = path,
+              old_text = original,
+              new_text = proposed,
+              editable = false,
+              on_accept = function()
+                reply("once")
+              end,
+              on_reject = function()
+                reply("reject")
+              end,
+            })
+            if open_err then
+              vim.notify("Cannot open OpenCode inline diff: " .. open_err, vim.log.levels.ERROR)
               reply("reject")
-            end,
-          })
-          if open_err then
-            vim.notify("Cannot open OpenCode inline diff: " .. open_err, vim.log.levels.ERROR)
-            reply("reject")
+            end
           end
+          show_review()
         end
-        show_review()
+
+        local ready = false
+        local cancel = save_wait.when_saved(find_loaded_buffer(path), function()
+          ready = true
+          opencode_save_waits[permission_key] = nil
+          if not resolved_opencode_permissions[permission_key] then
+            review_from_disk()
+          end
+        end)
+        -- A clean buffer runs the review before when_saved returns.
+        if not ready then
+          opencode_save_waits[permission_key] = cancel
+        end
       end, function(err)
         vim.notify("Failed to review OpenCode edit: " .. tostring(err), vim.log.levels.ERROR)
       end)
@@ -644,13 +668,19 @@ function M.setup_claude()
     end
 
     local path = resolve_path(old_file_path)
-    local loaded_buf = find_loaded_buffer(path)
-    if loaded_buf and vim.bo[loaded_buf].modified then
-      error({
-        code = -32000,
-        message = "Inline diff setup failed",
-        data = "The target buffer has unsaved changes: " .. path,
-      })
+    -- Claude already waits on this coroutine for the reply, so it can also
+    -- wait while the user saves or discards unsaved edits in the file.
+    local ready = false
+    local cancel = save_wait.when_saved(find_loaded_buffer(path), function()
+      ready = true
+      claude_save_waits[tab_name] = nil
+      if coroutine.status(co) == "suspended" then
+        coroutine.resume(co)
+      end
+    end)
+    if not ready then
+      claude_save_waits[tab_name] = cancel
+      coroutine.yield()
     end
 
     local original = read_file(path) or ""
@@ -713,6 +743,10 @@ function M.setup_claude()
   end
 
   diff.close_diff_by_tab_name = function(tab_name)
+    if claude_save_waits[tab_name] then
+      claude_save_waits[tab_name]()
+      claude_save_waits[tab_name] = nil
+    end
     local id = "claude:" .. tab_name
     if reviews[id] then
       resolve_review(id, false)
@@ -822,73 +856,83 @@ function M.setup_antigravity()
 
   diff.open = function(filePath, content)
     local path = resolve_path(filePath)
-    local loaded_buf = find_loaded_buffer(path)
-    if loaded_buf and vim.bo[loaded_buf].modified then
-      vim.notify("Antigravity edit rejected: the target buffer has unsaved changes: " .. path, vim.log.levels.ERROR)
-      send_diff_response("ide/diffRejected", filePath)
-      return { status = "rejected" }
-    end
 
-    local win = find_editor_window(path)
-    if not win then
-      vim.cmd("split")
-    end
+    local function open_now()
+      local win = find_editor_window(path)
+      if not win then
+        vim.cmd("split")
+      end
 
-    local original = read_file(path) or ""
-    local id = "antigravity:" .. path
+      local original = read_file(path) or ""
+      local id = "antigravity:" .. path
 
-    local _, open_err = open_review({
-      id = id,
-      path = path,
-      old_text = original,
-      new_text = content,
-      editable = true,
-      on_accept = function(new_content)
-        local target_buf = find_loaded_buffer(path)
-        if not target_buf then
-          target_buf = vim.fn.bufnr(path, true)
-        end
-        if not vim.api.nvim_buf_is_loaded(target_buf) then
-          vim.fn.bufload(target_buf)
-        end
-
-        local lines, has_eol = split_text(new_content)
-        if target_buf and vim.api.nvim_buf_is_valid(target_buf) then
-          vim.bo[target_buf].endofline = has_eol
-          vim.api.nvim_buf_set_lines(target_buf, 0, -1, false, lines)
-          vim.api.nvim_buf_call(target_buf, function()
-            vim.cmd("silent! write!")
-          end)
-        else
-          local file, write_err = io.open(path, "wb")
-          if file then
-            file:write(new_content)
-            file:close()
-          else
-            vim.notify(
-              "Failed to write Antigravity edit to " .. path .. ": " .. tostring(write_err),
-              vim.log.levels.ERROR
-            )
+      local _, open_err = open_review({
+        id = id,
+        path = path,
+        old_text = original,
+        new_text = content,
+        editable = true,
+        on_accept = function(new_content)
+          local target_buf = find_loaded_buffer(path)
+          if not target_buf then
+            target_buf = vim.fn.bufnr(path, true)
           end
-        end
+          if not vim.api.nvim_buf_is_loaded(target_buf) then
+            vim.fn.bufload(target_buf)
+          end
 
-        send_diff_response("ide/diffAccepted", filePath)
-        vim.defer_fn(function()
-          vim.cmd("checktime")
-        end, 100)
-      end,
-      on_reject = function()
+          local lines, has_eol = split_text(new_content)
+          if target_buf and vim.api.nvim_buf_is_valid(target_buf) then
+            vim.bo[target_buf].endofline = has_eol
+            vim.api.nvim_buf_set_lines(target_buf, 0, -1, false, lines)
+            vim.api.nvim_buf_call(target_buf, function()
+              vim.cmd("silent! write!")
+            end)
+          else
+            local file, write_err = io.open(path, "wb")
+            if file then
+              file:write(new_content)
+              file:close()
+            else
+              vim.notify(
+                "Failed to write Antigravity edit to " .. path .. ": " .. tostring(write_err),
+                vim.log.levels.ERROR
+              )
+            end
+          end
+
+          send_diff_response("ide/diffAccepted", filePath)
+          vim.defer_fn(function()
+            vim.cmd("checktime")
+          end, 100)
+        end,
+        on_reject = function()
+          send_diff_response("ide/diffRejected", filePath)
+        end,
+      })
+
+      if open_err then
+        vim.notify("Cannot open Antigravity inline diff: " .. open_err, vim.log.levels.ERROR)
         send_diff_response("ide/diffRejected", filePath)
-      end,
-    })
+        return { status = "rejected" }
+      end
 
-    if open_err then
-      vim.notify("Cannot open Antigravity inline diff: " .. open_err, vim.log.levels.ERROR)
-      send_diff_response("ide/diffRejected", filePath)
-      return { status = "rejected" }
+      return { status = "opened" }
     end
 
-    return { status = "opened" }
+    -- With unsaved edits in the file, answer "opened" now and build the
+    -- review once the user saves or discards them.
+    local result = { status = "opened" }
+    local ready = false
+    local cancel = save_wait.when_saved(find_loaded_buffer(path), function()
+      ready = true
+      antigravity_save_waits[path] = nil
+      result = open_now()
+    end)
+    if not ready then
+      antigravity_save_waits[path] = cancel
+    end
+    return result
   end
 
   vim.api.nvim_create_user_command("AntigravityDiffAccept", function()
@@ -940,6 +984,11 @@ function M.setup_antigravity()
 
   if originals.close then
     diff.close = function(filePath, ...)
+      local waiting = antigravity_save_waits[resolve_path(filePath)]
+      if waiting then
+        waiting()
+        antigravity_save_waits[resolve_path(filePath)] = nil
+      end
       local id = "antigravity:" .. resolve_path(filePath)
       if reviews[id] then
         resolve_review(id, false)

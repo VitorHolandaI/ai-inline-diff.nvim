@@ -47,6 +47,10 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   directly with 1.x and 2.x events: edits, other permissions, 2.x edits
   without a diff or over two files, replies, the `permit()` arguments for
   each version, and `with_server()` choosing the connected server.
+- `save_wait_test.lua` checks `../lua/ai_inline_diff/save_wait.lua`: a
+  clean buffer runs at once, an unsaved one waits with a winbar notice,
+  and `:w`, `:e!` or a wipe run it exactly once and restore the winbar,
+  while a cancelled wait never runs.
 - `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
   at the edge of what the parser takes: omitted counts, leading zeros,
   numbers so large that `tonumber()` returns `1e+26` or `inf`, non-ASCII
@@ -89,6 +93,7 @@ nvim -l tests/patch_test.lua
 nvim -l tests/claude_adapter_test.lua
 nvim -l tests/deprecated_api_test.lua
 nvim -l tests/opencode_event_test.lua
+nvim -l tests/save_wait_test.lua
 nvim -l tests/lint.lua
 nvim -l tests/coverage.lua --missing
 ```

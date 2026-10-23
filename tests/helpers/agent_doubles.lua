@@ -27,6 +27,25 @@ local function review_buffer()
   end
 end
 
+-- The read-only OpenCode review is what OpenCode would write. It may open
+-- later than the proposal (after the user saves the file), so its text is
+-- recorded whenever a review buffer enters a window. A review opened right
+-- away, from inside the permission autocmd, fires no BufWinEnter (autocmds
+-- do not nest), so the caller also snapshots it after the event.
+---@return fun(): string? latest review text
+local function record_review_text()
+  local latest
+  vim.api.nvim_create_autocmd("BufWinEnter", {
+    pattern = "ai-inline-diff://*",
+    callback = function(args)
+      latest = buffer_text(args.buf)
+    end,
+  })
+  return function()
+    return latest
+  end
+end
+
 --- Claude Code calls the `openDiff` tool, which claudecode.nvim runs in a
 --- coroutine and answers with FILE_SAVED plus the content, or DIFF_REJECTED.
 ---@param path string
@@ -101,6 +120,7 @@ function M.propose_opencode(path, patch)
       return promise
     end,
   }
+  local review_text = record_review_text()
   require("ai_inline_diff").setup_opencode()
   vim.api.nvim_exec_autocmds("User", {
     pattern = "OpencodeEvent:permission.asked",
@@ -112,11 +132,14 @@ function M.propose_opencode(path, patch)
       },
     },
   })
-  local shown = review_buffer() and buffer_text(review_buffer()) or nil
+  local opened_now = review_buffer() and buffer_text(review_buffer()) or nil
+  local function shown()
+    return review_text() or opened_now
+  end
   outcome_readers.opencode = function()
     local choice = server.choices[#server.choices]
     if choice == "once" then
-      return { reply = "accepted", content = shown }
+      return { reply = "accepted", content = shown() }
     end
     return { reply = choice == "reject" and "rejected" or "pending" }
   end
@@ -185,6 +208,7 @@ function M.propose_opencode_v2(path, patch, extra_files)
   for index = 1, extra_files or 0 do
     files[#files + 1] = { file = path .. ".extra" .. index, patch = patch, status = "modified" }
   end
+  local review_text = record_review_text()
   require("ai_inline_diff").setup_opencode()
   vim.api.nvim_exec_autocmds("User", {
     pattern = "OpencodeEvent:permission.asked",
@@ -203,12 +227,15 @@ function M.propose_opencode_v2(path, patch, extra_files)
       },
     },
   })
-  local shown = review_buffer() and buffer_text(review_buffer()) or nil
+  local opened_now = review_buffer() and buffer_text(review_buffer()) or nil
+  local function shown()
+    return review_text() or opened_now
+  end
   outcome_readers["opencode-v2"] = function()
     local last = server.replies[#server.replies]
     local addressed = last and last.session_id == "session-1" and last.request_id == "permission-1"
     if addressed and last.choice == "once" then
-      return { reply = "accepted", content = shown }
+      return { reply = "accepted", content = shown() }
     end
     return { reply = addressed and last.choice == "reject" and "rejected" or "pending" }
   end

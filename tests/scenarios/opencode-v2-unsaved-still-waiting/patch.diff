@@ -1,0 +1,11 @@
+--- sample.lua
++++ sample.lua
+@@ -17,7 +17,7 @@
+ end
+ 
+ function M.run()
+-  print(greet("world"))
++  print(greet("neovim"))
+   print(M.average({ 1, 2, 3 }))
+ end
+ 

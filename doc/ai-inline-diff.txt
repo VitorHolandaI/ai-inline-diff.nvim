@@ -255,9 +255,16 @@ You can also call it from Lua:
 ==============================================================================
 7. SAFETY                                              *ai-inline-diff-safety*
 
+An edit to a file whose buffer has unsaved changes waits: the windows
+showing that buffer get a winbar notice, and the review opens once the
+buffer is saved, discarded with |:edit!|, or undone back to the saved
+text. Answering the agent in its own terminal stops the wait. The review
+then compares the file on disk with what the agent will write; Claude Code
+and OpenCode write what they prepared when they asked, so text saved in the
+meantime (format-on-save included) shows as lines the edit would revert.
+
 An edit is not accepted when:
 
-- The target buffer already has unsaved changes.
 - The target is a symbolic link whose real file has unsaved buffer changes.
 - The target file changes on disk while the review is open.
 - The target buffer changes or is replaced while the review is open.
@@ -318,6 +325,8 @@ lua/ai_inline_diff/text.lua
     Splitting and joining file content.
 lua/ai_inline_diff/opencode_event.lua
     Reading OpenCode 1.x and 2.x permission events and replying to them.
+lua/ai_inline_diff/save_wait.lua
+    Holding an edit until the target buffer has no unsaved changes.
 lua/ai_inline_diff/terminal.lua
     Terminal focus and navigation.
 lua/ai_inline_diff/location.lua

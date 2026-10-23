@@ -17,6 +17,7 @@ local recorder = helpers.CheckRecorder.new()
 ---@field keys string[] typed one entry at a time, as with nvim_input
 ---@field reply "accepted"|"rejected"|"pending" pending: no reply was sent
 ---@field extra_files integer? opencode-v2 only: more entries in metadata.files
+---@field unsaved_lines string[]? typed into the file's buffer, unsaved, before the agent proposes
 
 ---@param path string
 ---@return string
@@ -98,6 +99,13 @@ local function run_scenario(dir, deps)
   local proposal = read_raw(find_file(dir, spec.agent:find("^opencode") and "patch" or "proposed"))
 
   local nvim = open_session(target, deps)
+  if spec.unsaved_lines then
+    nvim:lua(
+      "vim.api.nvim_buf_set_lines(vim.fn.bufnr((...)), 0, -1, false, select(2, ...))",
+      target,
+      spec.unsaved_lines
+    )
+  end
   local propose = "propose_" .. spec.agent:gsub("-", "_")
   nvim:lua("package.loaded.agent_doubles[select(1, ...)](select(2, ...))", propose, target, proposal, spec.extra_files)
   vim.wait(150)
@@ -112,10 +120,12 @@ local function run_scenario(dir, deps)
   if spec.reply == "accepted" then
     recorder:check(name .. ": agent writes expected content", outcome.content, read_raw(find_file(dir, "expected")))
   end
-  if spec.agent ~= "antigravity" or spec.reply == "rejected" then
-    -- Only the agent writes in these cases; Neovim must leave the file alone.
+  if spec.agent ~= "antigravity" or spec.reply ~= "accepted" then
+    -- Only the agent writes in these cases. Neovim leaves the file as it was,
+    -- or as the scenario's own keys saved it (disk.<ext>).
     local on_disk = vim.fn.filereadable(target) == 1 and read_raw(target) or nil
-    recorder:check(name .. ": file on disk untouched by Neovim", on_disk, original)
+    local disk_file = find_file(dir, "disk")
+    recorder:check(name .. ": file on disk as expected", on_disk, disk_file and read_raw(disk_file) or original)
   end
 end
 

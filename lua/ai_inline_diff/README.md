@@ -27,6 +27,13 @@ a way for an agent to show a file range in the editor.
   daemon needs credentials the autocmd data does not carry, so a server
   rebuilt from the url gets 401. Only `setup_opencode()` in `init.lua` uses
   this module.
+- `save_wait.lua` holds an agent edit while the target buffer has unsaved
+  changes. `when_saved()` runs its callback at once for a clean buffer;
+  otherwise it puts a winbar notice on the windows showing the buffer and
+  waits for `BufModifiedSet` (`:w`, `:e!`, undo back to the saved text) or
+  a wipe, then restores the winbars and runs it. It returns a cancel
+  function. The three adapters in `init.lua` call it before building a
+  review, and cancel it when the agent answers or closes the diff itself.
 - `text.lua` splits file content into lines and joins it back, keeping the
   final newline and CRLF endings. `init.lua` uses it to read proposals and
   OpenCode patches, and `review_changes.lua` to diff the buffer against the
