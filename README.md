@@ -168,8 +168,9 @@ terminal, so you can keep talking while you read.
 2. Each agent starts with the instruction file
    [`instructions/open-location.md`](instructions/open-location.md). Claude
    Code reads it through `--append-system-prompt-file` and OpenCode through
-   the `instructions` list in its global config. The file tells the agent to run the
-   script when you ask to see code, and what to do when the script fails.
+   the `instructions` list in its global config. The file tells the agent to
+   run the script when you ask to see code, and what to do when the script
+   fails.
 3. The agent finds the code the way it always does, by reading and searching
    files, and then runs something like:
 

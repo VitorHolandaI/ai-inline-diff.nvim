@@ -11,7 +11,8 @@ A folder holds:
 
 - `scenario.lua` returns `{ agent = ..., keys = { ... }, reply = ... }`.
   `agent` is `"claude"`, `"antigravity"`, `"opencode"` (1.x events) or
-  `"opencode-v2"` (2.x events, with an optional `extra_files` count); `keys` uses
+  `"opencode-v2"` (2.x events, with an optional `extra_files` count);
+  `keys` uses
   `nvim_input()` notation such as `"<M-n>"` or `"ciwfoo<Esc>"`; `reply` is
   `"accepted"`, `"rejected"` or `"pending"` (nothing may be sent).
 - `original.<ext>` is the file before the edit. Leave it out to propose a
