@@ -132,6 +132,16 @@ so ALT-Y and ALT-X only show a warning there.
 
 Only edits that the agent sends to Neovim for approval are reviewed. An
 edit made by a shell command, such as `sed -i`, goes straight to disk.
+
+                                                 *ai-inline-diff-live-changes*
+Edits written without asking (OpenCode "Always allow", Claude Code
+auto-accept) can still be followed: >lua
+  require("ai_inline_diff").setup_live_changes()
+<
+It watches the files open in Neovim. When one changes on disk and its
+buffer has no unsaved changes, the buffer reloads at once and the changed
+lines are marked like a review, until you enter Insert mode, change the
+text, or the agent writes again. `u` undoes the agent's change.
 `docs/how-an-edit-flows.md` follows one edit through the code, from the
 agent to the file on disk.
 
@@ -329,6 +339,8 @@ lua/ai_inline_diff/opencode_event.lua
     Reading OpenCode 1.x and 2.x permission events and replying to them.
 lua/ai_inline_diff/save_wait.lua
     Holding an edit until the target buffer has no unsaved changes.
+lua/ai_inline_diff/live_changes.lua
+    Reloading and marking files agents write without a review.
 lua/ai_inline_diff/terminal.lua
     Terminal focus and navigation.
 lua/ai_inline_diff/location.lua

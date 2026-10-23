@@ -1022,6 +1022,12 @@ function M.open_location(path, first_line, last_line)
 end
 
 --- Let agents run `nvim-open-location` from terminals opened afterwards.
+--- Reload open files that agents write directly (OpenCode "Always allow",
+--- Claude auto-accept) and mark what changed until you edit them.
+function M.setup_live_changes()
+  require("ai_inline_diff.live_changes").setup()
+end
+
 function M.setup_open_location()
   require("ai_inline_diff.location").setup()
 end

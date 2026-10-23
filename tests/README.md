@@ -51,6 +51,11 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   clean buffer runs at once, an unsaved one waits with a winbar notice,
   and `:w`, `:e!` or a wipe run it exactly once and restore the winbar,
   while a cancelled wait never runs.
+- `live_changes_test.lua` checks `../lua/ai_inline_diff/live_changes.lua`:
+  a file written on disk reloads and gets marked, a second write replaces
+  the marks, Insert mode or an edit clears them, unsaved user text is never
+  replaced, the user's own `:w` is not marked, and a temp-file-and-rename
+  write is still seen.
 - `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
   at the edge of what the parser takes: omitted counts, leading zeros,
   numbers so large that `tonumber()` returns `1e+26` or `inf`, non-ASCII
@@ -95,6 +100,7 @@ nvim -l tests/claude_adapter_test.lua
 nvim -l tests/deprecated_api_test.lua
 nvim -l tests/opencode_event_test.lua
 nvim -l tests/save_wait_test.lua
+nvim -l tests/live_changes_test.lua
 nvim -l tests/lint.lua
 nvim -l tests/coverage.lua --missing
 ```

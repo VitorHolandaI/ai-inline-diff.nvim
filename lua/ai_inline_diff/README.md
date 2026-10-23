@@ -39,13 +39,22 @@ a way for an agent to show a file range in the editor.
   OpenCode patches, and `review_changes.lua` to diff the buffer against the
   original.
 - `review_changes.lua` draws a review (removed lines as `DiffDelete` virtual
-  lines, proposed lines as `DiffAdd`, a `✓` sign on kept changes) and
+  lines, proposed lines as `DiffAdd`, a `✓` sign on kept changes, through
+  `draw()`, which `live_changes.lua` also uses) and
   handles `<M-y>`/`<M-x>`. `keep_selected()` marks the selected change in
   the `AiInlineDiffKept` namespace; `drop_selected()` writes the original
   lines back into the buffer. Both then diff the original against the
   buffer again and either select the next undecided change through
   `review_selection.lua` or, when none is left, call the accept or reject
   function `open_review()` passed in.
+- `live_changes.lua` follows edits written without a review.
+  `setup()` (called through `setup_live_changes()` in `init.lua`) keeps one
+  libuv directory watcher per directory with open files, since a file
+  replaced by rename would lose a per-file watcher. A change to an open,
+  unmodified file reloads it with `:edit!` (cursors kept, undo kept through
+  'undoreload') and draws the diff through `review_changes.draw()` in the
+  `AiInlineDiffLive` namespace, cleared on InsertEnter or a later text
+  change.
 - `review_selection.lua` moves the cursor inside a review. `select_hunk()`
   selects a change's proposed lines in linewise Visual mode,
   `select_adjacent()` does the same for the change after or before the

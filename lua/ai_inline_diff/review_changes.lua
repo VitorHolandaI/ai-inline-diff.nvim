@@ -20,19 +20,48 @@ local kept_namespace = vim.api.nvim_create_namespace("AiInlineDiffKept")
 ---@field reject fun()
 
 ---@param buf integer
+---@param ns integer
 ---@param hunk AiInlineDiffHunk
 ---@param old_lines string[]
-local function render_removed_lines(buf, hunk, old_lines)
+local function draw_removed_lines(buf, ns, hunk, old_lines)
   local old_start, old_count, new_start, new_count = unpack(hunk)
   local virtual_lines = {}
   for index = old_start, old_start + old_count - 1 do
     virtual_lines[#virtual_lines + 1] = { { "- ", "DiffDelete" }, { old_lines[index] or "", "DiffDelete" } }
   end
-  vim.api.nvim_buf_set_extmark(buf, namespace, math.max(new_start - 1, 0), 0, {
+  vim.api.nvim_buf_set_extmark(buf, ns, math.max(new_start - 1, 0), 0, {
     strict = false,
     virt_lines = virtual_lines,
     virt_lines_above = new_count > 0 or new_start == 0,
   })
+end
+
+--- Draw changes in `ns`: removed lines as DiffDelete virtual lines, the
+--- current lines as DiffAdd with the sign `sign_for(hunk)` returns. Used by
+--- reviews and by live_changes.lua for files agents wrote directly.
+---@param buf integer
+---@param ns integer
+---@param hunks AiInlineDiffHunk[]
+---@param old_lines string[]
+---@param sign_for fun(hunk: AiInlineDiffHunk): string
+function M.draw(buf, ns, hunks, old_lines, sign_for)
+  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+  local line_count = vim.api.nvim_buf_line_count(buf)
+  for _, hunk in ipairs(hunks) do
+    if hunk[2] > 0 then
+      draw_removed_lines(buf, ns, hunk, old_lines)
+    end
+    local sign = sign_for(hunk)
+    for index = hunk[3], math.min(hunk[3] + hunk[4] - 1, line_count) do
+      if index >= 1 then
+        vim.api.nvim_buf_set_extmark(buf, ns, index - 1, 0, {
+          line_hl_group = "DiffAdd",
+          sign_text = sign,
+          sign_hl_group = "DiffAdd",
+        })
+      end
+    end
+  end
 end
 
 ---@param review AiInlineDiffReviewState
@@ -44,28 +73,12 @@ local function is_kept(review, hunk)
   return #marks > 0
 end
 
---- Draw removed lines as virtual lines and proposed lines as DiffAdd, with
---- a "✓" sign on changes kept with <M-y>.
+--- Draw a review's changes, with a "✓" sign on changes kept with <M-y>.
 ---@param review AiInlineDiffReviewState
 function M.render(review)
-  vim.api.nvim_buf_clear_namespace(review.buf, namespace, 0, -1)
-  local old_lines = text.split(review.original_text)
-  local line_count = vim.api.nvim_buf_line_count(review.buf)
-  for _, hunk in ipairs(review.hunks) do
-    if hunk[2] > 0 then
-      render_removed_lines(review.buf, hunk, old_lines)
-    end
-    local sign = is_kept(review, hunk) and "✓" or "+"
-    for index = hunk[3], math.min(hunk[3] + hunk[4] - 1, line_count) do
-      if index >= 1 then
-        vim.api.nvim_buf_set_extmark(review.buf, namespace, index - 1, 0, {
-          line_hl_group = "DiffAdd",
-          sign_text = sign,
-          sign_hl_group = "DiffAdd",
-        })
-      end
-    end
-  end
+  M.draw(review.buf, namespace, review.hunks, text.split(review.original_text), function(hunk)
+    return is_kept(review, hunk) and "✓" or "+"
+  end)
 end
 
 -- No lines must diff as "", not "\n": a missing original file would

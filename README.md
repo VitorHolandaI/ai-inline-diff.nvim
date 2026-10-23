@@ -73,6 +73,7 @@ return {
     lazy = false,
     config = function()
       require("ai_inline_diff").setup_terminal()
+      require("ai_inline_diff").setup_live_changes()
     end,
   },
   {
@@ -269,6 +270,22 @@ Claude Code and OpenCode write the content they prepared when they asked,
 so anything you saved in the meantime, including changes made by a
 format-on-save hook, shows up as lines the edit would revert.
 
+### Edits written without a review
+
+When an agent writes a file without asking, as OpenCode does after "Always
+allow" or Claude Code in auto-accept mode, there is no review to show.
+`setup_live_changes()` watches the files open in Neovim instead: when one
+changes on disk and its buffer has no unsaved changes, the buffer reloads
+at once and the changed lines are marked the same way a review marks them.
+The marks stay until you enter Insert mode or change the text, or until the
+agent writes again. `u` undoes the agent's change. A buffer with unsaved
+changes is left alone.
+
+OpenCode 2.x does not tell opencode.nvim when it writes a file (its file
+watcher only follows `.git/HEAD`), so without this the buffer only reloads
+when Neovim checks the disk, for example when you leave the agent's
+terminal.
+
 ### What gets reviewed
 
 The plugin only sees edits that the agent sends to Neovim for approval.
@@ -295,6 +312,7 @@ nvim -l tests/claude_adapter_test.lua
 nvim -l tests/deprecated_api_test.lua
 nvim -l tests/opencode_event_test.lua
 nvim -l tests/save_wait_test.lua
+nvim -l tests/live_changes_test.lua
 ```
 
 `scenarios_test.lua` replays each folder in `tests/scenarios/`. A simulated
