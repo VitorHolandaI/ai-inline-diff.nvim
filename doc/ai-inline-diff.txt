@@ -20,6 +20,10 @@ This plugin shows edits proposed by OpenCode, Claude Code, and Antigravity
 inside the editor window you are working in. It does not open a side-by-side
 diff or a new tab.
 
+It is a personal plugin built for one workflow, the agents running in
+terminals inside Neovim on the versions below. Other setups are not tested,
+and keys or behavior may change when that workflow does.
+
 The review temporarily replaces an editor window with the proposed file:
 
 - Removed/original lines are virtual lines highlighted with |DiffDelete|.
