@@ -39,12 +39,14 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
     fires `OpencodeEvent:permission.asked` with `FakeOpencodeServer`
     standing in for `opencode.server`. Scenarios with agent `opencode-v2`
     send the OpenCode 2.x event shape instead, and `FakeOpencodeV2Server`
-    only counts a reply made as `permit(sessionID, id, choice)`. `outcome()` reports what the agent
+    only counts a reply made as `permit(sessionID, id, choice)`. Like the
+    real 2.x daemon, it is reachable only as `opencode.server.connected`;
+    `new(url)` fails with 401. `outcome()` reports what the agent
     would receive.
 - `opencode_event_test.lua` calls `../lua/ai_inline_diff/opencode_event.lua`
   directly with 1.x and 2.x events: edits, other permissions, 2.x edits
-  without a diff or over two files, replies, and the `permit()` arguments
-  for each version.
+  without a diff or over two files, replies, the `permit()` arguments for
+  each version, and `with_server()` choosing the connected server.
 - `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
   at the edge of what the parser takes: omitted counts, leading zeros,
   numbers so large that `tonumber()` returns `1e+26` or `inf`, non-ASCII

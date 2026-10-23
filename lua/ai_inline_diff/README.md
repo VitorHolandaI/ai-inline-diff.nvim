@@ -22,7 +22,11 @@ a way for an agent to show a file range in the editor.
   with the diff in `data.metadata.files`, and answers with `permit()`, which
   takes `(id, choice)` on 1.x and `(sessionID, id, choice)` on 2.x. It
   returns a reason instead of an edit when a 2.x request has no diff or
-  covers several files. Only `setup_opencode()` in `init.lua` uses it.
+  covers several files. `with_server()` hands the handler the server
+  opencode.nvim is connected to when its url matches the event: the 2.x
+  daemon needs credentials the autocmd data does not carry, so a server
+  rebuilt from the url gets 401. Only `setup_opencode()` in `init.lua` uses
+  this module.
 - `text.lua` splits file content into lines and joins it back, keeping the
   final newline and CRLF endings. `init.lua` uses it to read proposals and
   OpenCode patches, and `review_changes.lua` to diff the buffer against the

@@ -38,7 +38,7 @@ the proposed text, and two callbacks: what to do on accept and on reject.
 
 Claude Code calls its `openDiff` tool. claudecode.nvim runs the tool in a
 coroutine and calls `diff.open_diff_blocking()`, which `setup_claude()`
-replaces (`lua/ai_inline_diff/init.lua:643`):
+replaces (`lua/ai_inline_diff/init.lua:640`):
 
 ```lua
 diff.open_diff_blocking = function(old_file_path, _, new_file_contents, tab_name, client_id)
@@ -71,7 +71,7 @@ OpenCode sends a patch instead of the full file. It arrives as the
 1.x puts it in `properties.metadata.diff`, 2.x in
 `data.metadata.files[1].patch`. `opencode_event.edit_request()` reads
 either one, and the plugin rebuilds the proposed file from the patch before
-it opens the review (`init.lua:561`):
+it opens the review (`init.lua:559`):
 
 ```lua
 local original = read_file(path) or ""
@@ -194,7 +194,7 @@ line ending (LF or CRLF) and keeps or drops the final newline to match.
 
 Which side writes the file depends on the agent. For Claude Code, the
 accept callback resumes the waiting coroutine with `FILE_SAVED` and the
-final text (`claude_result()`, `init.lua:620`):
+final text (`claude_result()`, `init.lua:617`):
 
 ```lua
 return { content = { { type = "text", text = "FILE_SAVED" }, { type = "text", text = content } } }
@@ -206,7 +206,7 @@ text. Neovim leaves the file alone here and Claude Code writes it once the
 reply arrives. A rejection sends `DIFF_REJECTED` instead.
 
 Antigravity's accept callback writes the file from Neovim
-(`init.lua:849`). It puts the text into the file's buffer, runs
+(`init.lua:846`). It puts the text into the file's buffer, runs
 `:write!`, and then tells Antigravity the diff was accepted:
 
 ```lua
@@ -222,8 +222,11 @@ send_diff_response("ide/diffAccepted", filePath)
 
 OpenCode applies its own patch. The plugin only answers the permission
 request with `once` or `reject` through `opencode_event.permit()`
-(`init.lua:528`), which calls `server:permit(id, choice)` on 1.x and
-`server:permit(sessionID, id, choice)` on 2.x.
+(`init.lua:526`), which calls `server:permit(id, choice)` on 1.x and
+`server:permit(sessionID, id, choice)` on 2.x. On 2.x the reply has to go
+through the server opencode.nvim is already connected to
+(`opencode_event.with_server()`): the background server requires
+credentials, and the autocmd only passes its url.
 The review is read-only, so what you saw is the patch OpenCode was asking
 to apply, rebuilt by `apply_unified_patch()`.
 

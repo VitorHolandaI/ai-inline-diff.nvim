@@ -94,4 +94,68 @@ opencode_event.permit(
 )
 recorder:check("2.x permit(session, id, choice)", v2_server.calls, { { "session-1", "permission-1", "reject" } })
 
+-- with_server(): the 2.x daemon rejects servers rebuilt from a bare url
+-- (401), so the connected server must be used when it is the same one.
+local function with_fake_server_module(connected, new_result)
+  package.loaded["opencode.server"] = {
+    connected = connected,
+    new = function(url)
+      local promise = {}
+      function promise:next(on_server)
+        if new_result == "ok" then
+          on_server({ url = url, rebuilt = true })
+        end
+        return promise
+      end
+      function promise:catch(on_error)
+        if new_result ~= "ok" then
+          on_error("401 Authentication required")
+        end
+        return promise
+      end
+      return promise
+    end,
+  }
+end
+
+local function run_with_server(url)
+  local got, failed
+  opencode_event.with_server(url, function(server)
+    got = server
+  end, function(err)
+    failed = tostring(err)
+  end)
+  return got, failed
+end
+
+with_fake_server_module({ url = "http://daemon" }, "unauthorized")
+local got, failed = run_with_server("http://daemon")
+recorder:check(
+  "with_server uses the connected server for its url",
+  { got and got.url, failed },
+  { "http://daemon", nil }
+)
+
+with_fake_server_module({ url = "http://other" }, "ok")
+got = run_with_server("http://daemon")
+recorder:check("with_server rebuilds a server for another url", got and got.rebuilt, true)
+
+with_fake_server_module(nil, "unauthorized")
+got, failed = run_with_server("http://daemon")
+recorder:check("with_server reports a failed rebuild", { got, failed ~= nil }, { nil, true })
+
+with_fake_server_module({ url = "http://daemon" }, "ok")
+failed = nil
+opencode_event.with_server("http://daemon", function()
+  error("handler broke")
+end, function(err)
+  failed = tostring(err)
+end)
+recorder:check(
+  "with_server reports an error in the handler",
+  failed ~= nil and failed:find("handler broke", 1, true) ~= nil,
+  true
+)
+package.loaded["opencode.server"] = nil
+
 recorder:finish()

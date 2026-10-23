@@ -514,96 +514,93 @@ function M.setup_opencode()
       local permission_key = opencode_permission_key(args.data.url, edit.id)
       resolved_opencode_permissions[permission_key] = false
       local id = "opencode:" .. permission_key
-      require("opencode.server")
-        .new(args.data.url)
-        :next(function(server)
+      opencode_event.with_server(args.data.url, function(server)
+        if resolved_opencode_permissions[permission_key] then
+          return
+        end
+
+        local function submit_reply(choice, on_failure)
           if resolved_opencode_permissions[permission_key] then
             return
           end
-
-          local function submit_reply(choice, on_failure)
-            if resolved_opencode_permissions[permission_key] then
-              return
+          opencode_event.permit(server, edit, choice):catch(function(err)
+            notify_permission_error(err)
+            if not resolved_opencode_permissions[permission_key] and on_failure then
+              on_failure()
             end
-            opencode_event.permit(server, edit, choice):catch(function(err)
-              notify_permission_error(err)
-              if not resolved_opencode_permissions[permission_key] and on_failure then
-                on_failure()
-              end
-            end)
-          end
+          end)
+        end
 
-          local function reject_with_retry()
-            local function retry_reject()
-              vim.ui.select(
-                { "Retry reject", "Leave pending" },
-                { prompt = "OpenCode rejection failed" },
-                function(choice)
-                  if choice == "Retry reject" and not resolved_opencode_permissions[permission_key] then
-                    submit_reply("reject", retry_reject)
-                  end
+        local function reject_with_retry()
+          local function retry_reject()
+            vim.ui.select(
+              { "Retry reject", "Leave pending" },
+              { prompt = "OpenCode rejection failed" },
+              function(choice)
+                if choice == "Retry reject" and not resolved_opencode_permissions[permission_key] then
+                  submit_reply("reject", retry_reject)
                 end
-              )
-            end
-            submit_reply("reject", retry_reject)
+              end
+            )
           end
+          submit_reply("reject", retry_reject)
+        end
 
-          -- OpenCode 2.x servers have no cwd; resolve_path then tries Neovim's.
-          local path = resolve_path(edit.filepath, server.cwd)
-          local loaded_buf = find_loaded_buffer(path)
-          if loaded_buf and vim.bo[loaded_buf].modified then
-            vim.notify("OpenCode edit rejected: the target buffer has unsaved changes", vim.log.levels.ERROR)
+        -- OpenCode 2.x servers have no cwd; resolve_path then tries Neovim's.
+        local path = resolve_path(edit.filepath, server.cwd)
+        local loaded_buf = find_loaded_buffer(path)
+        if loaded_buf and vim.bo[loaded_buf].modified then
+          vim.notify("OpenCode edit rejected: the target buffer has unsaved changes", vim.log.levels.ERROR)
+          reject_with_retry()
+          return
+        end
+
+        local original = read_file(path) or ""
+        local proposed, patch_err = M.apply_unified_patch(original, edit.diff)
+        if not proposed then
+          vim.notify(
+            "OpenCode diff could not be rendered; answer the pending permission in its terminal: " .. patch_err,
+            vim.log.levels.WARN
+          )
+          return
+        end
+
+        local function show_review()
+          if resolved_opencode_permissions[permission_key] then
+            return
+          end
+          if current_review and current_review ~= id then
+            vim.notify("OpenCode edit rejected because another AI review is active", vim.log.levels.WARN)
             reject_with_retry()
             return
           end
 
-          local original = read_file(path) or ""
-          local proposed, patch_err = M.apply_unified_patch(original, edit.diff)
-          if not proposed then
-            vim.notify(
-              "OpenCode diff could not be rendered; answer the pending permission in its terminal: " .. patch_err,
-              vim.log.levels.WARN
-            )
-            return
+          local function reply(choice)
+            submit_reply(choice, show_review)
           end
 
-          local function show_review()
-            if resolved_opencode_permissions[permission_key] then
-              return
-            end
-            if current_review and current_review ~= id then
-              vim.notify("OpenCode edit rejected because another AI review is active", vim.log.levels.WARN)
-              reject_with_retry()
-              return
-            end
-
-            local function reply(choice)
-              submit_reply(choice, show_review)
-            end
-
-            local _, open_err = open_review({
-              id = id,
-              path = path,
-              old_text = original,
-              new_text = proposed,
-              editable = false,
-              on_accept = function()
-                reply("once")
-              end,
-              on_reject = function()
-                reply("reject")
-              end,
-            })
-            if open_err then
-              vim.notify("Cannot open OpenCode inline diff: " .. open_err, vim.log.levels.ERROR)
+          local _, open_err = open_review({
+            id = id,
+            path = path,
+            old_text = original,
+            new_text = proposed,
+            editable = false,
+            on_accept = function()
+              reply("once")
+            end,
+            on_reject = function()
               reply("reject")
-            end
+            end,
+          })
+          if open_err then
+            vim.notify("Cannot open OpenCode inline diff: " .. open_err, vim.log.levels.ERROR)
+            reply("reject")
           end
-          show_review()
-        end)
-        :catch(function(err)
-          vim.notify("Failed to review OpenCode edit: " .. tostring(err), vim.log.levels.ERROR)
-        end)
+        end
+        show_review()
+      end, function(err)
+        vim.notify("Failed to review OpenCode edit: " .. tostring(err), vim.log.levels.ERROR)
+      end)
     end,
     desc = "Review OpenCode edits inline",
   })

@@ -77,4 +77,24 @@ function M.permit(server, edit, choice)
   return server:permit(edit.id, choice)
 end
 
+--- Call `on_server` with the opencode.nvim server behind `url`.
+--- The OpenCode 2.x daemon needs credentials that only the connected server
+--- object holds (autocmd data carries the url alone), so it is preferred;
+--- 1.x servers can be rebuilt from the url.
+---@param url string
+---@param on_server fun(server: table)
+---@param on_error fun(err: unknown)
+function M.with_server(url, on_server, on_error)
+  local opencode_server = require("opencode.server")
+  local connected = opencode_server.connected
+  if type(connected) == "table" and connected.url == url then
+    local ok, err = pcall(on_server, connected)
+    if not ok then
+      on_error(err)
+    end
+    return
+  end
+  opencode_server.new(url):next(on_server):catch(on_error)
+end
+
 return M

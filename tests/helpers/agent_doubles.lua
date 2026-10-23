@@ -123,6 +123,7 @@ function M.propose_opencode(path, patch)
 end
 
 ---@class FakeOpencodeV2Server
+---@field url string
 ---@field replies { session_id: string, request_id: string, choice: string }[]
 local FakeOpencodeV2Server = {}
 FakeOpencodeV2Server.__index = FakeOpencodeV2Server
@@ -158,13 +159,28 @@ end
 --- OpenCode 2.x sends `{ id, type, data }` events. An edit permission carries
 --- one entry per file in data.metadata.files, each `{ file, patch, status }`
 --- (from OpenCode 2.1.4's edit, write and patch tools). The server object has
---- no `cwd`, and the reply needs the session id.
+--- no `cwd`, and the reply needs the session id. The 2.x daemon requires
+--- credentials that the autocmd does not carry, so like the real one,
+--- `new(url)` fails with 401 and only `connected` can answer.
 ---@param path string
 ---@param patch string unified diff for files[1]
 ---@param extra_files integer? more entries in metadata.files
 function M.propose_opencode_v2(path, patch, extra_files)
-  local server = setmetatable({ replies = {} }, FakeOpencodeV2Server)
-  serve_opencode(server)
+  local server = setmetatable({ url = "http://fake-opencode", replies = {} }, FakeOpencodeV2Server)
+  package.loaded["opencode.server"] = {
+    connected = server,
+    new = function()
+      local promise = {}
+      function promise:next()
+        return promise
+      end
+      function promise:catch(on_error)
+        on_error('{"_tag":"UnauthorizedError","message":"Authentication required"}')
+        return promise
+      end
+      return promise
+    end,
+  }
   local files = { { file = path, patch = patch, status = "modified", additions = 1, deletions = 1 } }
   for index = 1, extra_files or 0 do
     files[#files + 1] = { file = path .. ".extra" .. index, patch = patch, status = "modified" }
