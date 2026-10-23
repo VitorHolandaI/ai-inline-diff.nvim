@@ -1,0 +1,3 @@
+# Scenario files are test data compared byte for byte, not code to format.
+tests/scenarios/
+tests/.deps/

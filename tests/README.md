@@ -36,6 +36,26 @@ external test framework. Each exits with code 1 on any failed check.
     fires `OpencodeEvent:permission.asked` with `FakeOpencodeServer`
     standing in for `opencode.server`. `outcome()` reports what the agent
     would receive.
+- `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
+  at the edge of what the parser takes: omitted counts, leading zeros,
+  numbers so large that `tonumber()` returns `1e+26` or `inf`, non-ASCII
+  digits. Each must give the right text or a clean `(nil, message)` within
+  100 ms.
+- `claude_adapter_test.lua` loads the pinned claudecode.nvim and checks how
+  `setup_claude()` answers through `_G.claude_deferred_responses`, the
+  table claudecode.nvim fills while Claude waits on `openDiff`: the stored
+  sender gets FILE_SAVED or DIFF_REJECTED once and is removed, an error in
+  the waiting coroutine reaches it as a JSON-RPC error, and a missing table
+  changes nothing.
+- `deprecated_api_test.lua` wraps `vim.diff()` and `vim.keymap.set()` in a
+  child, drives a review, the per-change keys and `open_location()`, and
+  fails if a plugin file calls `vim.diff()` or passes `buffer =` to a
+  keymap.
+- `lint.lua` is not a `*_test.lua` file, so `coverage.lua` does not run it.
+  It runs lua-language-server on `../lua/` with a config written per run
+  (Neovim's type stubs live in `$VIMRUNTIME`), stylua with
+  `../stylua.toml` and `../.styluaignore`, and shellcheck on
+  `../bin/nvim-open-location`, and fails on any finding or missing tool.
 - `coverage.lua` runs every `*_test.lua` with `AI_INLINE_DIFF_COVERAGE_DIR`
   set. `helpers/embedded_nvim.lua` sees the variable and loads
   `helpers/coverage_hook.lua` into each child, which counts the plugin lines
@@ -54,5 +74,9 @@ nvim -l tests/terminal_test.lua
 nvim -l tests/location_test.lua
 nvim -l tests/review_test.lua
 nvim -l tests/scenarios_test.lua
+nvim -l tests/patch_test.lua
+nvim -l tests/claude_adapter_test.lua
+nvim -l tests/deprecated_api_test.lua
+nvim -l tests/lint.lua
 nvim -l tests/coverage.lua --missing
 ```

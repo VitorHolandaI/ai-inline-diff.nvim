@@ -68,16 +68,27 @@ function M.render(review)
   end
 end
 
+-- No lines must diff as "", not "\n": a missing original file would
+-- otherwise gain a phantom empty line and a change that never resolves.
+---@param lines string[]
+---@return string
+local function diffable_text(lines)
+  if #lines == 0 or (#lines == 1 and lines[1] == "") then
+    return ""
+  end
+  return text.join(lines, true)
+end
+
 -- Diffs the original against what the buffer holds now, so hand edits and
 -- dropped changes are both reflected.
 ---@param review AiInlineDiffReviewState
 local function refresh(review)
   local old_lines = text.split(review.original_text)
   local new_lines = vim.api.nvim_buf_get_lines(review.buf, 0, -1, false)
-  review.hunks = vim.diff(text.join(old_lines, true), text.join(new_lines, true), {
+  review.hunks = vim.text.diff(diffable_text(old_lines), diffable_text(new_lines), {
     algorithm = "histogram",
     result_type = "indices",
-  })
+  }) --[[@as AiInlineDiffHunk[] ]]
   M.render(review)
 end
 

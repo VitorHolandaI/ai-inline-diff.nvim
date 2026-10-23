@@ -33,11 +33,20 @@ end
 ---@param line_count integer
 local function validate_range(path, first_line, last_line, line_count)
   if not is_line_between(first_line, 1, line_count) then
-    error(string.format("first line %s is outside '%s', expected integer 1-%d", vim.inspect(first_line), path, line_count), 0)
+    error(
+      string.format("first line %s is outside '%s', expected integer 1-%d", vim.inspect(first_line), path, line_count),
+      0
+    )
   end
   if not is_line_between(last_line, first_line, line_count) then
     error(
-      string.format("last line %s is invalid for '%s', expected integer %d-%d", vim.inspect(last_line), path, first_line, line_count),
+      string.format(
+        "last line %s is invalid for '%s', expected integer %d-%d",
+        vim.inspect(last_line),
+        path,
+        first_line,
+        line_count
+      ),
       0
     )
   end

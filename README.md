@@ -10,7 +10,10 @@ permission API only accepts or rejects the original patch.
 
 ## Requirements
 
-You need the Neovim plugin for each agent you use. This plugin never talks to
+You need Neovim 0.12 or newer, which renamed `vim.diff()` to
+`vim.text.diff()` and the `buffer` option of `vim.keymap.set()` to `buf`;
+the plugin uses the new names. You also need the Neovim plugin for each
+agent you use. This plugin never talks to
 the agents directly; it hooks into their plugins.
 
 | Agent       | Plugin                                                                                  | Setup call            |
@@ -255,6 +258,9 @@ nvim -l tests/terminal_test.lua
 nvim -l tests/location_test.lua
 nvim -l tests/review_test.lua
 nvim -l tests/scenarios_test.lua
+nvim -l tests/patch_test.lua
+nvim -l tests/claude_adapter_test.lua
+nvim -l tests/deprecated_api_test.lua
 ```
 
 `scenarios_test.lua` replays each folder in `tests/scenarios/`. A simulated
@@ -265,6 +271,9 @@ antigravity-cli.nvim, cloned at the pinned versions into `tests/.deps/` on
 the first run. OpenCode edits arrive as its permission event.
 [`tests/scenarios/README.md`](tests/scenarios/README.md) explains how to add
 a scenario.
+
+`nvim -l tests/lint.lua` runs lua-language-server, stylua and shellcheck and
+fails on any finding. It takes each tool from `$PATH` or from Mason.
 
 `nvim -l tests/coverage.lua` runs all of them and prints line coverage for
 each file in `lua/ai_inline_diff/`. Add `--missing` to list the lines that

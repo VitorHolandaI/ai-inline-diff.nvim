@@ -54,7 +54,7 @@ function M.map(buf, actions)
     { { "n", "x", "i" }, "<M-p>", actions.previous_change, "Previous AI change" },
   }
   for _, keymap in ipairs(keymaps) do
-    vim.keymap.set(keymap[1], keymap[2], keymap[3], { buffer = buf, desc = keymap[4] })
+    vim.keymap.set(keymap[1], keymap[2], keymap[3], { buf = buf, desc = keymap[4] })
   end
 end
 

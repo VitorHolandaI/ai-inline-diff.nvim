@@ -151,10 +151,11 @@ local function open_review(opts)
   local new_lines, new_has_eol, new_line_ending = split_text(opts.new_text)
   local normalized_old = join_lines(old_lines, old_has_eol)
   local normalized_new = join_lines(new_lines, new_has_eol)
-  local hunks = vim.diff(normalized_old, normalized_new, {
+  -- result_type = indices always yields a list; nil only comes with on_hunk.
+  local hunks = vim.text.diff(normalized_old, normalized_new, {
     algorithm = "histogram",
     result_type = "indices",
-  })
+  }) --[[@as AiInlineDiffHunk[] ]]
 
   local buf = vim.api.nvim_create_buf(false, true)
   local safe_id = tostring(opts.id):gsub("[^%w_.-]", "_")
@@ -251,7 +252,10 @@ local function open_review(opts)
     end,
   })
 
-  vim.notify("AI edit: <M-a>/<M-r> accept/reject all, <M-y>/<M-x> keep/drop change, <M-n>/<M-p> move", vim.log.levels.INFO)
+  vim.notify(
+    "AI edit: <M-a>/<M-r> accept/reject all, <M-y>/<M-x> keep/drop change, <M-n>/<M-p> move",
+    vim.log.levels.INFO
+  )
   return review
 end
 
@@ -268,9 +272,10 @@ local function detect_trimmed_patch_prefix(old_lines, patch_lines)
     if not old_start then
       patch_index = patch_index + 1
     else
-      old_start = tonumber(old_start)
-      old_count = tonumber(old_count ~= "" and old_count or "1")
-      new_count = tonumber(new_count ~= "" and new_count or "1")
+      -- (%d+) captures always convert; tests/patch_test.lua covers huge values.
+      old_start = tonumber(old_start) --[[@as integer]]
+      old_count = tonumber(old_count ~= "" and old_count or "1") --[[@as integer]]
+      new_count = tonumber(new_count ~= "" and new_count or "1") --[[@as integer]]
       old_index = math.max(old_count == 0 and old_start + 1 or old_start, 1)
       patch_index = patch_index + 1
 
@@ -379,10 +384,10 @@ function M.apply_unified_patch(original, patch)
       patch_index = patch_index + 1
     else
       found_hunk = true
-      old_start = tonumber(old_start)
-      old_count = tonumber(old_count ~= "" and old_count or "1")
-      new_start = tonumber(new_start)
-      new_count = tonumber(new_count ~= "" and new_count or "1")
+      old_start = tonumber(old_start) --[[@as integer]]
+      old_count = tonumber(old_count ~= "" and old_count or "1") --[[@as integer]]
+      new_start = tonumber(new_start) --[[@as integer]]
+      new_count = tonumber(new_count ~= "" and new_count or "1") --[[@as integer]]
 
       local target = old_count == 0 and old_start + 1 or old_start
       target = math.max(target, 1)
@@ -648,14 +653,17 @@ function M.setup_claude()
     local function resume(result)
       local ok, resumed_result = coroutine.resume(co, result)
       local co_key = tostring(co)
-      local sender = _G.claude_deferred_responses and _G.claude_deferred_responses[co_key]
-      if sender then
+      -- claudecode.nvim owns this global; tests/claude_adapter_test.lua pins its use.
+      ---@type table<string, fun(reply: table)>?
+      local deferred = rawget(_G, "claude_deferred_responses")
+      local sender = deferred and deferred[co_key]
+      if deferred and sender then
         if ok then
           sender(resumed_result)
         else
           sender({ error = { code = -32603, message = "Internal error", data = tostring(resumed_result) } })
         end
-        _G.claude_deferred_responses[co_key] = nil
+        deferred[co_key] = nil
       end
     end
 
@@ -810,10 +818,7 @@ function M.setup_antigravity()
     local path = resolve_path(filePath)
     local loaded_buf = find_loaded_buffer(path)
     if loaded_buf and vim.bo[loaded_buf].modified then
-      vim.notify(
-        "Antigravity edit rejected: the target buffer has unsaved changes: " .. path,
-        vim.log.levels.ERROR
-      )
+      vim.notify("Antigravity edit rejected: the target buffer has unsaved changes: " .. path, vim.log.levels.ERROR)
       send_diff_response("ide/diffRejected", filePath)
       return { status = "rejected" }
     end
