@@ -85,6 +85,19 @@ local function get_buffer_text(buf)
   return join_lines(lines, vim.bo[buf].endofline, vim.b[buf].ai_inline_diff_line_ending)
 end
 
+-- A fixed id makes snacks.nvim replace the box instead of stacking a new
+-- one for every review.
+local review_keys_hint_id = "ai_inline_diff_review_keys"
+
+-- The hint only applies while a review is open. Other notifiers have no
+-- hide-by-id, so there it just times out.
+local function close_review_keys_hint()
+  local ok, notifier = pcall(require, "snacks.notifier")
+  if ok then
+    notifier.hide(review_keys_hint_id)
+  end
+end
+
 local function restore_review(review)
   reviews[review.id] = nil
   if current_review == review.id then
@@ -129,6 +142,7 @@ local function resolve_review(id, accepted, invoke_callback)
   end
 
   review.resolving = true
+  close_review_keys_hint()
   local proposed_text = get_buffer_text(review.buf)
   if accepted then
     live_changes.expect_accepted_write(review.path, proposed_text)
@@ -268,7 +282,11 @@ local function open_review(opts)
     hint[#hint + 1] = "Alt-y / Alt-x  keep / drop this change"
   end
   vim.list_extend(hint, { "Alt-a          accept all", "Alt-r          reject all" })
-  vim.notify(table.concat(hint, "\n"), vim.log.levels.INFO, { title = "ai-inline-diff", timeout = 60000 })
+  vim.notify(
+    table.concat(hint, "\n"),
+    vim.log.levels.INFO,
+    { title = "ai-inline-diff", timeout = 60000, id = review_keys_hint_id }
+  )
   return review
 end
 

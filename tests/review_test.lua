@@ -260,6 +260,34 @@ local function test_key_hint_lasts_a_minute_and_fits_the_agent()
   nvim:stop()
 end
 
+-- One hint box at a time: each review used to add a box, and a few edits in
+-- a row stacked them down the screen. The box also closes with the review.
+local function test_key_hint_replaces_itself_and_closes_with_the_review()
+  local path = write_original_file()
+  local nvim = open_session(path)
+  nvim:lua([[
+    _G.hint_ids, _G.hidden = {}, {}
+    vim.notify = function(message, _, opts)
+      if tostring(message):find("^AI edit: review keys") then
+        table.insert(_G.hint_ids, opts and opts.id or "none")
+      end
+    end
+    package.loaded["snacks.notifier"] = {
+      hide = function(id)
+        table.insert(_G.hidden, id)
+      end,
+    }
+  ]])
+  propose(nvim, path, edited_text({ [3] = "three" }))
+  nvim:input("<M-r>")
+  propose(nvim, path, edited_text({ [4] = "four" }))
+  local ids = nvim:lua("return _G.hint_ids")
+  check("each hint is shown with an id", #ids == 2 and ids[1] ~= "none", true)
+  check("every review reuses the same hint box", ids[1], ids[2])
+  check("ending the review closes the hint box", nvim:lua("return _G.hidden"), { ids[1] })
+  nvim:stop()
+end
+
 test_opens_with_first_change_selected()
 test_key_hint_lasts_a_minute_and_fits_the_agent()
 test_navigation_selects_each_change()
@@ -269,4 +297,5 @@ test_alt_a_accepts_from_each_mode()
 test_alt_r_rejects_from_insert()
 test_da_in_visual_accepts_instead_of_deleting()
 test_reload_of_agent_write_is_not_stale()
+test_key_hint_replaces_itself_and_closes_with_the_review()
 recorder:finish()

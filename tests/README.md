@@ -26,7 +26,8 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   covers the first change selected on open
   (`../lua/ai_inline_diff/review_selection.lua`), `]c`/`[c`, and `<M-n>`,
   `<M-p>`, `<M-a>`, `<M-r>` and `da` from each mode
-  (`../lua/ai_inline_diff/review_keys.lua`).
+  (`../lua/ai_inline_diff/review_keys.lua`), and the key hint: one box
+  reused across reviews and closed when the review ends.
 - `scenarios_test.lua` replays each folder in `scenarios/` (see
   `scenarios/README.md`) in its own child Neovim and compares what the agent
   would write with the scenario's `expected.*`. Pass a folder name to run

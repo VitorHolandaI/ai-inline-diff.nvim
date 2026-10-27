@@ -321,7 +321,9 @@ selected in linewise Visual mode, showing which lines the agent wants to
 write. A change that only removes lines has nothing to select, so the
 cursor goes to where the lines were and you stay in Normal mode. A
 notification lists the keys that work for that agent and stays up for a
-minute.
+minute, or until the review ends. With snacks.nvim's notifier there is only
+ever one: a new review replaces the box instead of stacking another, and
+accepting or rejecting closes it.
 
 | Keys                    | Modes                  | Action                             |
 | ----------------------- | ---------------------- | ---------------------------------- |
