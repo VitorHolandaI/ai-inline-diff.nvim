@@ -16,7 +16,9 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   `<C-h>`, and option validation.
 - `location_test.lua` checks `../lua/ai_inline_diff/location.lua` through
   `open_location()`, and `../bin/nvim-open-location` as an agent would run
-  it: from another cwd, with `$NVIM` pointing at the child.
+  it: from another cwd, with `$NVIM` pointing at the child. It also checks
+  that `../instructions/open-location.md` keeps telling agents to change
+  files only with their edit tools, since a shell write skips the review.
 - `review_test.lua` checks what a review looks like and how it ends, through
   `setup_antigravity()` with `FakeAntigravityDiff` standing in for
   `antigravity-cli.diff` and recording the replies sent to the agent. It

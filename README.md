@@ -211,7 +211,8 @@ terminal, so you can keep talking while you read.
    Code reads it through `--append-system-prompt-file` and OpenCode through
    the `instructions` list in its global config. The file tells the agent to
    run the script when you ask to see code, and what to do when the script
-   fails.
+   fails. It also tells the agent to change files only with its edit tools,
+   never through the shell, so every change reaches the review.
 3. The agent finds the code the way it always does, by reading and searching
    files, and then runs something like:
 
@@ -331,7 +332,9 @@ With Claude Code that is an `openDiff` request, with OpenCode an `edit`
 permission request, and with Antigravity a diff it opens. An edit the agent
 makes by running a shell command, such as `sed -i` or `echo >> file`, goes
 straight to disk and never shows up as a review. Neovim's `'autoread'`, on
-by default, reloads the buffer once it notices the change.
+by default, reloads the buffer once it notices the change. The instruction
+file tells agents to use their edit tools instead. Models usually follow it,
+but it is an instruction, not a guarantee.
 
 [`docs/how-an-edit-flows.md`](docs/how-an-edit-flows.md) follows one edit
 from the agent to the file on disk, with the code that runs at each step.
