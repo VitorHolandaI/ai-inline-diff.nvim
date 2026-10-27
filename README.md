@@ -165,16 +165,59 @@ OpenCode outside Neovim then asks too, in its own interface.
 
 Answering "Always allow" to an edit request saves an `edit *` rule for the
 whole project, and the rule outlives the session. From then on OpenCode
-edits every file in that project without asking. To list the saved rules and
-remove one, run these from inside the project:
+edits every file in that project without asking. OpenCode's database holds
+the saved rules, one per project, and its API removes one by id:
 
 ```sh
-opencode api GET /api/permission/saved
+sqlite3 ~/.local/share/opencode/opencode.db \
+  "select p.id, pr.worktree from permission p join project pr on pr.id = p.project_id"
 opencode api DELETE /api/permission/saved/<id>
 ```
 
-Edits that the model makes through the shell (`sed -i`, a Python script)
-skip the `edit` permission entirely. See
+`opencode api GET /api/permission/saved` only lists the rules of one
+project, and not always the one you ran it from, so read the ids from the
+database.
+
+#### Both agents: edit tools only, never the shell
+
+Setting the permission modes is not enough. An agent can also change a file
+by running a shell command: `sed -i`, `echo >> file`, `cat <<EOF > file`,
+`tee`, or a Python script that calls `write_text()`. That command goes
+through the agent's shell permission, not its edit permission, so Neovim
+never gets a review. The change is already on disk when you see it.
+
+Agents do this most with Markdown and other docs. Over three days of real
+use, OpenCode changed every `.md` file through the shell and never with its
+edit tools. Asked to write "hello world" at the top of a notes file, Claude
+Code ran `sed -i '1i hello world' anotacao.md`.
+
+To prevent it, both agents have to load
+[`instructions/open-location.md`](instructions/open-location.md). Its
+"Changing files" section tells the agent to change files only with its edit
+and write tools and never through the shell. Shell commands that only read
+files are still allowed.
+
+- **Claude Code** reads it through `--append-system-prompt-file`, set in the
+  claudecode.nvim config (see [Setup](#setup)). It applies to Claude
+  sessions started after the change. Sessions already open keep the old
+  prompt.
+- **OpenCode** reads it from the `instructions` list in
+  `~/.config/opencode/opencode.jsonc`:
+
+  ```jsonc
+  {
+    "permission": { "edit": "ask" },
+    "instructions": ["/path/to/ai-inline-diff.nvim/instructions/open-location.md"]
+  }
+  ```
+
+  Run `opencode service restart` after adding it. The shared background
+  server reads its configuration only when it starts.
+
+This is an instruction to the model, not a lock, so a model can still use
+the shell once in a while. To check, look at the tool the agent ran: an
+edit tool means a review opened, while `Bash`/`shell` running `sed -i` or a
+script means the file was written without one. See
 [What gets reviewed](#what-gets-reviewed).
 
 ## Moving between the editor and agent terminals

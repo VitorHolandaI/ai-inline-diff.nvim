@@ -293,9 +293,13 @@ path relative to the worktree rather than the Neovim working directory.
 
 The agent changed a file without showing a review ~
 
-1. Check whether the agent used a shell command, such as `sed -i`, instead
-   of its edit tool. Those edits are never reviewed; ask the agent to use
-   its edit tool.
+1. Check whether the agent used a shell command, such as `sed -i`, `echo >`
+   or a Python script, instead of its edit tool. Those edits are never
+   reviewed. Agents do this most with Markdown files. Both agents have to
+   load `instructions/open-location.md`, which tells them to change files
+   only with their edit tools: Claude Code through
+   `--append-system-prompt-file`, OpenCode through `instructions` in
+   `opencode.jsonc` (then `opencode service restart`).
 2. Check that the setup function for that agent ran after the agent
    plugin's own setup (|ai-inline-diff-setup|).
 3. For OpenCode, check that `permission.edit` is `"ask"` in
@@ -304,8 +308,9 @@ The agent changed a file without showing a review ~
    `opencode service restart` after changing it, since the background
    server reads its configuration only when it starts. An "Always allow"
    answer is saved for the whole project and outlives the session: list
-   the saved rules with `opencode api GET /api/permission/saved` and remove
-   one with `opencode api DELETE /api/permission/saved/<id>`.
+   the saved rules and their ids with
+   `sqlite3 ~/.local/share/opencode/opencode.db "select id from permission"`
+   and remove one with `opencode api DELETE /api/permission/saved/<id>`.
 4. For Claude Code, check that the status bar shows `manual mode on`
    (mode `default`). `auto` and `acceptEdits` write edits without asking.
    Set `permissions.defaultMode = "default"` in `~/.claude/settings.json`,
