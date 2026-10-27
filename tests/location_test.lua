@@ -185,13 +185,18 @@ local function test_setup_puts_script_on_path()
 end
 
 -- A shell write (sed -i, a Python script) skips the edit permission, so no
--- review opens; the shared instructions steer agents to their edit tools.
+-- review opens: agents prefer edit tools and announce any shell write.
 local function test_instructions_keep_file_changes_reviewable()
   local nvim = helpers.EmbeddedNvim.start(plugin_root)
   local path = nvim:lua("return require('ai_inline_diff').open_location_instructions()")
   local text = table.concat(vim.fn.readfile(path), "\n")
-  check("instructions ask for edit tools", text:find("Change files with those\ntools only", 1, true) ~= nil, true)
-  check("instructions rule out sed -i", text:find("`sed -i`", 1, true) ~= nil, true)
+  check("instructions prefer edit tools", text:find("Use those tools by default", 1, true) ~= nil, true)
+  check("instructions name sed -i as a shell write", text:find("`sed -i`", 1, true) ~= nil, true)
+  check(
+    "instructions require a notice for shell writes",
+    text:find("Edited through the shell, not reviewed:", 1, true) ~= nil,
+    true
+  )
   nvim:stop()
 end
 

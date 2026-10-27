@@ -296,8 +296,9 @@ The agent changed a file without showing a review ~
 1. Check whether the agent used a shell command, such as `sed -i`, `echo >`
    or a Python script, instead of its edit tool. Those edits are never
    reviewed. Agents do this most with Markdown files. Both agents have to
-   load `instructions/open-location.md`, which tells them to change files
-   only with their edit tools: Claude Code through
+   load `instructions/open-location.md`, which tells them to prefer their
+   edit tools and, when a shell write saves work, to say "Edited
+   through the shell, not reviewed:" and the files: Claude Code through
    `--append-system-prompt-file`, OpenCode through `instructions` in
    `opencode.jsonc` (then `opencode service restart`).
 2. Check that the setup function for that agent ran after the agent

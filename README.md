@@ -178,7 +178,7 @@ opencode api DELETE /api/permission/saved/<id>
 project, and not always the one you ran it from, so read the ids from the
 database.
 
-#### Both agents: edit tools only, never the shell
+#### Both agents: edit tools first, and a notice for shell edits
 
 Setting the permission modes is not enough. An agent can also change a file
 by running a shell command: `sed -i`, `echo >> file`, `cat <<EOF > file`,
@@ -191,11 +191,21 @@ use, OpenCode changed every `.md` file through the shell and never with its
 edit tools. Asked to write "hello world" at the top of a notes file, Claude
 Code ran `sed -i '1i hello world' anotacao.md`.
 
-To prevent it, both agents have to load
-[`instructions/open-location.md`](instructions/open-location.md). Its
-"Changing files" section tells the agent to change files only with its edit
-and write tools and never through the shell. Shell commands that only read
-files are still allowed.
+Forbidding the shell outright would cost tokens: the same mechanical change
+across many files is one `sed` command but dozens of edit calls. So both
+agents load [`instructions/open-location.md`](instructions/open-location.md),
+whose "Changing files" section asks for two things:
+
+1. Use the edit and write tools by default, Markdown included.
+2. Use a shell write only when it clearly saves work, and then say so in the
+   reply right after the command, naming every file it changed:
+
+   > Edited through the shell, not reviewed: `path/one.md`, `path/two.lua`
+
+That line tells you which files to check yourself. If those files are open
+in Neovim, [`setup_live_changes()`](#edits-written-without-a-review) also
+marks the changed lines. Shell commands that only read files need no
+notice.
 
 - **Claude Code** reads it through `--append-system-prompt-file`, set in the
   claudecode.nvim config (see [Setup](#setup)). It applies to Claude
@@ -214,10 +224,10 @@ files are still allowed.
   Run `opencode service restart` after adding it. The shared background
   server reads its configuration only when it starts.
 
-This is an instruction to the model, not a lock, so a model can still use
-the shell once in a while. To check, look at the tool the agent ran: an
-edit tool means a review opened, while `Bash`/`shell` running `sed -i` or a
-script means the file was written without one. See
+This is an instruction to the model, not a lock, so a model can still skip
+the notice. To check, look at the tool the agent ran: an edit tool means a
+review opened, while `Bash`/`shell` running `sed -i` or a script means the
+file was written without one. See
 [What gets reviewed](#what-gets-reviewed).
 
 ## Moving between the editor and agent terminals
@@ -254,8 +264,9 @@ terminal, so you can keep talking while you read.
    Code reads it through `--append-system-prompt-file` and OpenCode through
    the `instructions` list in its global config. The file tells the agent to
    run the script when you ask to see code, and what to do when the script
-   fails. It also tells the agent to change files only with its edit tools,
-   never through the shell, so every change reaches the review.
+   fails. It also tells the agent to change files with its edit tools, and
+   to name any file it changes through the shell instead, since those
+   changes skip the review.
 3. The agent finds the code the way it always does, by reading and searching
    files, and then runs something like:
 
@@ -376,8 +387,9 @@ permission request, and with Antigravity a diff it opens. An edit the agent
 makes by running a shell command, such as `sed -i` or `echo >> file`, goes
 straight to disk and never shows up as a review. Neovim's `'autoread'`, on
 by default, reloads the buffer once it notices the change. The instruction
-file tells agents to use their edit tools instead. Models usually follow it,
-but it is an instruction, not a guarantee.
+file asks agents to prefer their edit tools and to name any file they change
+through the shell. Models usually follow it, but it is an instruction, not a
+guarantee.
 
 [`docs/how-an-edit-flows.md`](docs/how-an-edit-flows.md) follows one edit
 from the agent to the file on disk, with the code that runs at each step.

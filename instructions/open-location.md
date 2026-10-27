@@ -21,9 +21,17 @@ nvim-open-location path/to/file:FIRST-LAST
 
 # Changing files
 
-The user reviews every file change in Neovim before it reaches the disk, and
-that review only sees your edit and write tools. Change files with those
-tools only, Markdown and other docs included. Never change a file through
-the shell: no `sed -i`, `echo >`/`>>`, `cat <<EOF >`, `tee`, or scripts that
-write files (Python `write_text`, `open(..., "w")`). A shell write lands on
-disk without a review. Shell commands that only read files are fine.
+The user reviews file changes in Neovim before they reach the disk, and that
+review only sees your edit and write tools. Use those tools by default,
+Markdown and other docs included.
+
+A shell write (`sed -i`, `echo >`/`>>`, `cat <<EOF >`, `tee`, or a script
+that writes files, like Python `write_text`) lands on disk without a
+review. Use one only when it clearly saves work, such as the same
+mechanical change across many files or a very large file. When you do,
+say so in your reply right after the command, before anything else:
+
+> Edited through the shell, not reviewed: `path/one.md`, `path/two.lua`
+
+List every file the command changed. Shell commands that only read files
+need no notice.
