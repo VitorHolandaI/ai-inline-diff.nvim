@@ -127,9 +127,69 @@ local function test_atomic_rename_is_seen()
   nvim:stop()
 end
 
+---@param nvim EmbeddedNvim
+local function capture_notices(nvim)
+  nvim:lua([[
+    _G.notices = {}
+    vim.notify = function(message, level)
+      table.insert(_G.notices, { message = tostring(message), level = level })
+    end
+  ]])
+end
+
+---@param nvim EmbeddedNvim
+---@return string[]
+local function unreviewed_notices(nvim)
+  return nvim:lua([[
+    local found = {}
+    for _, notice in ipairs(_G.notices) do
+      if notice.message:find("without a review", 1, true) then
+        found[#found + 1] = notice.message
+      end
+    end
+    return found
+  ]])
+end
+
+-- The marks fade once the user edits; the message stays in the history and
+-- names the file, so a write the user did not watch can still be found.
+local function test_unreviewed_write_is_announced()
+  local nvim, path = open_watched_file()
+  capture_notices(nvim)
+  agent_writes(path, { "one", "TWO", "three", "four" })
+  local expected = string.format("Agent changed %s without a review: +2 -1 lines", vim.fn.fnamemodify(path, ":~:."))
+  check("unreviewed write names the file and line counts", unreviewed_notices(nvim), { expected })
+  check("unreviewed write notice is INFO", nvim:lua("return (_G.notices[1] or {}).level"), vim.log.levels.INFO)
+  nvim:stop()
+end
+
+-- After Alt-a, Claude Code and OpenCode write the text the user just
+-- reviewed themselves; that write must not be reported as unreviewed.
+local function test_accepted_review_write_is_not_announced()
+  local nvim, path = open_watched_file()
+  capture_notices(nvim)
+  nvim:lua("package.loaded.agent_doubles = dofile(...)", plugin_root .. "/tests/helpers/agent_doubles.lua")
+  nvim:lua(
+    "package.loaded.agent_doubles.propose_opencode_v2(...)",
+    path,
+    "Index: x\n" .. string.rep("=", 67) .. "\n--- x\n+++ x\n@@ -2 +2 @@\n-two\n+TWO\n"
+  )
+  vim.wait(200)
+  nvim:input("<M-a>")
+  vim.wait(200)
+  check("review was accepted", nvim:lua("return package.loaded.agent_doubles.outcome('opencode-v2').reply"), "accepted")
+  agent_writes(path, { "one", "TWO", "three" })
+  check("accepted review write is not announced", unreviewed_notices(nvim), {})
+  agent_writes(path, { "one", "TWO", "three", "four" })
+  check("a later unreviewed write is announced again", #unreviewed_notices(nvim), 1)
+  nvim:stop()
+end
+
 test_agent_write_reloads_and_marks_changes()
 test_marks_stay_until_the_user_edits()
 test_unsaved_user_edits_are_kept()
 test_own_save_is_not_marked()
 test_atomic_rename_is_seen()
+test_unreviewed_write_is_announced()
+test_accepted_review_write_is_not_announced()
 recorder:finish()

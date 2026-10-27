@@ -58,7 +58,9 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   a file written on disk reloads and gets marked, a second write replaces
   the marks, Insert mode or an edit clears them, unsaved user text is never
   replaced, the user's own `:w` is not marked, and a temp-file-and-rename
-  write is still seen.
+  write is still seen. An unreviewed write is announced with the file and
+  line counts, and the agent's write after an accepted OpenCode review is
+  not.
 - `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
   at the edge of what the parser takes: omitted counts, leading zeros,
   numbers so large that `tonumber()` returns `1e+26` or `inf`, non-ASCII

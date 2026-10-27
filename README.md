@@ -374,6 +374,17 @@ The marks stay until you enter Insert mode or change the text, or until the
 agent writes again. `u` undoes the agent's change. A buffer with unsaved
 changes is left alone.
 
+Each such write also leaves a message that outlasts the marks:
+
+```text
+Agent changed docs/notes.md without a review: +2 -1 lines
+```
+
+It goes through `vim.notify`, so it shows in the notification history
+(`:messages`, or your notifier's history: `<leader>n` in LazyVim). The
+write an agent makes right after you accept its review is not announced,
+since you already saw it.
+
 OpenCode 2.x does not tell opencode.nvim when it writes a file (its file
 watcher only follows `.git/HEAD`), so without this the buffer only reloads
 when Neovim checks the disk, for example when you leave the agent's

@@ -18,6 +18,7 @@ local review_changes = require("ai_inline_diff.review_changes")
 local text = require("ai_inline_diff.text")
 local opencode_event = require("ai_inline_diff.opencode_event")
 local save_wait = require("ai_inline_diff.save_wait")
+local live_changes = require("ai_inline_diff.live_changes")
 
 local split_text = text.split
 local join_lines = text.join
@@ -129,6 +130,9 @@ local function resolve_review(id, accepted, invoke_callback)
 
   review.resolving = true
   local proposed_text = get_buffer_text(review.buf)
+  if accepted then
+    live_changes.expect_accepted_write(review.path, proposed_text)
+  end
   vim.bo[review.buf].modified = false
   restore_review(review)
 
@@ -1023,7 +1027,7 @@ end
 --- Reload open files that agents write directly (OpenCode "Always allow",
 --- Claude auto-accept) and mark what changed until you edit them.
 function M.setup_live_changes()
-  require("ai_inline_diff.live_changes").setup()
+  live_changes.setup()
 end
 
 function M.setup_open_location()

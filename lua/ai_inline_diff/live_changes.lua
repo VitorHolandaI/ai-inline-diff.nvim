@@ -16,6 +16,10 @@ local settle_ms = 150
 local directories = {}
 ---@type table<string, true>
 local pending = {}
+-- Text the agent is about to write because the user accepted its review,
+-- keyed by canonical path; that write is not reported as unreviewed.
+---@type table<string, string[]>
+local accepted_writes = {}
 
 ---@param buf integer
 ---@return boolean
@@ -67,6 +71,35 @@ local function reload_keeping_cursors(buf)
   end
 end
 
+-- The marks fade once the user edits, so the message history keeps a
+-- record of which file the agent changed without a review.
+---@param path string
+---@param hunks AiInlineDiffHunk[]
+local function announce_unreviewed(path, hunks)
+  local added, removed = 0, 0
+  for _, hunk in ipairs(hunks) do
+    removed = removed + hunk[2]
+    added = added + hunk[4]
+  end
+  vim.notify(
+    string.format("Agent changed %s without a review: +%d -%d lines", vim.fn.fnamemodify(path, ":~:."), added, removed),
+    vim.log.levels.INFO,
+    { title = "ai-inline-diff" }
+  )
+end
+
+---@param path string
+---@param new_lines string[]
+---@return boolean reviewed the disk now holds the text of an accepted review
+local function take_accepted_write(path, new_lines)
+  local expected = accepted_writes[path]
+  if not expected or not vim.deep_equal(expected, new_lines) then
+    return false
+  end
+  accepted_writes[path] = nil
+  return true
+end
+
 ---@param path string
 ---@param buf integer
 local function show_change(path, buf)
@@ -78,6 +111,7 @@ local function show_change(path, buf)
     return
   end
   local new_lines = text.split(table.concat(disk, "\n"))
+  local reviewed = take_accepted_write(path, new_lines)
   local old_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   if vim.deep_equal(old_lines, new_lines) then
     return
@@ -91,6 +125,9 @@ local function show_change(path, buf)
     return "+"
   end)
   clear_on_user_edit(buf)
+  if not reviewed then
+    announce_unreviewed(path, hunks)
+  end
 end
 
 ---@param path string
@@ -160,6 +197,15 @@ local function unwatch(buf)
     entry.handle:close()
     directories[dir] = nil
   end
+end
+
+--- Record the text an accepted review is about to write to `path`, so that
+--- write is not announced as unreviewed.
+--- Example: `expect_accepted_write(review.path, proposed_text)`
+---@param path string
+---@param proposed_text string
+function M.expect_accepted_write(path, proposed_text)
+  accepted_writes[paths.canonical_path(path)] = text.split(proposed_text)
 end
 
 --- Reload files that change on disk while open and unmodified, and mark

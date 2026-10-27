@@ -54,7 +54,10 @@ a way for an agent to show a file range in the editor.
   unmodified file reloads it with `:edit!` (cursors kept, undo kept through
   'undoreload') and draws the diff through `review_changes.draw()` in the
   `AiInlineDiffLive` namespace, cleared on InsertEnter or a later text
-  change.
+  change. Each such write is also announced with `vim.notify`, naming the
+  file and the line counts. `init.lua` calls `expect_accepted_write()` when
+  the user accepts a review, so the agent's write that follows is not
+  announced.
 - `review_selection.lua` moves the cursor inside a review. `select_hunk()`
   selects a change's proposed lines in linewise Visual mode,
   `select_adjacent()` does the same for the change after or before the

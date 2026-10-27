@@ -141,7 +141,10 @@ Edits written without asking (OpenCode "Always allow", Claude Code in
 It watches the files open in Neovim. When one changes on disk and its
 buffer has no unsaved changes, the buffer reloads at once and the changed
 lines are marked like a review, until you enter Insert mode, change the
-text, or the agent writes again. `u` undoes the agent's change.
+text, or the agent writes again. `u` undoes the agent's change. Each such
+write also sends "Agent changed {file} without a review: +N -M lines"
+through |vim.notify()|, so the message history keeps a record after the
+marks are gone. The write that follows an accepted review is not announced.
 `docs/how-an-edit-flows.md` follows one edit through the code, from the
 agent to the file on disk.
 
