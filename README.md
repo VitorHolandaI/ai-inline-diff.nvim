@@ -126,14 +126,34 @@ git clone https://github.com/VitorHolandaI/ai-inline-diff.nvim \
 
 The `setup_*()` calls are the same as above.
 
-### OpenCode permissions
+### Agent permission modes
 
-OpenCode has to ask before editing, or its edits land on disk before you can
-review them. OpenCode 2.x runs one background server for every client and
-reads its configuration when that server starts, so an environment variable
-set on the terminal inside Neovim only applies if that terminal happens to
-start the server. Put the setting in `~/.config/opencode/opencode.jsonc`
-instead:
+A review only opens when the agent asks before it edits. In any mode that
+edits without asking, the change goes straight to disk and nothing shows up
+in Neovim.
+
+#### Claude Code: `default` mode
+
+Run Claude Code in `default` mode (`⏸ manual mode on` in the status bar).
+`acceptEdits` and `auto` write edits without asking, `bypassPermissions`
+skips every prompt, and `plan` makes no edits at all. Claude Code starts in
+`auto`, so set the default in `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": { "defaultMode": "default" }
+}
+```
+
+`Shift+Tab` cycles the modes during a session. From `auto`, the first press
+switches to `default`.
+
+#### OpenCode: `edit` set to `ask`, and no saved "Always allow"
+
+OpenCode 2.x runs one background server for every client and reads its
+configuration when that server starts, so an environment variable set on the
+terminal inside Neovim only applies if that terminal happens to start the
+server. Put the setting in `~/.config/opencode/opencode.jsonc` instead:
 
 ```jsonc
 {
@@ -142,6 +162,20 @@ instead:
 ```
 
 OpenCode outside Neovim then asks too, in its own interface.
+
+Answering "Always allow" to an edit request saves an `edit *` rule for the
+whole project, and the rule outlives the session. From then on OpenCode
+edits every file in that project without asking. To list the saved rules and
+remove one, run these from inside the project:
+
+```sh
+opencode api GET /api/permission/saved
+opencode api DELETE /api/permission/saved/<id>
+```
+
+Edits that the model makes through the shell (`sed -i`, a Python script)
+skip the `edit` permission entirely. See
+[What gets reviewed](#what-gets-reviewed).
 
 ## Moving between the editor and agent terminals
 
@@ -215,7 +249,7 @@ local instructions = require("ai_inline_diff").open_location_instructions()
 opts.terminal_cmd = "claude --append-system-prompt-file " .. vim.fn.shellescape(instructions)
 
 -- Claude Code only. For OpenCode, add the file to
--- ~/.config/opencode/opencode.jsonc (see OpenCode permissions above):
+-- ~/.config/opencode/opencode.jsonc (see Agent permission modes above):
 --   "instructions": ["/path/to/ai-inline-diff.nvim/instructions/open-location.md"]
 ```
 
@@ -276,10 +310,11 @@ format-on-save hook, shows up as lines the edit would revert.
 ### Edits written without a review
 
 When an agent writes a file without asking, as OpenCode does after "Always
-allow" or Claude Code in auto-accept mode, there is no review to show.
-`setup_live_changes()` watches the files open in Neovim instead: when one
-changes on disk and its buffer has no unsaved changes, the buffer reloads
-at once and the changed lines are marked the same way a review marks them.
+allow" or Claude Code in `auto` or `acceptEdits` mode, there is no review
+to show. `setup_live_changes()` watches the files open in Neovim instead:
+when one changes on disk and its buffer has no unsaved changes, the buffer
+reloads at once and the changed lines are marked the same way a review marks
+them.
 The marks stay until you enter Insert mode or change the text, or until the
 agent writes again. `u` undoes the agent's change. A buffer with unsaved
 changes is left alone.

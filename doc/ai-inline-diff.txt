@@ -134,8 +134,8 @@ Only edits that the agent sends to Neovim for approval are reviewed. An
 edit made by a shell command, such as `sed -i`, goes straight to disk.
 
                                                  *ai-inline-diff-live-changes*
-Edits written without asking (OpenCode "Always allow", Claude Code
-auto-accept) can still be followed: >lua
+Edits written without asking (OpenCode "Always allow", Claude Code in
+`auto` or `acceptEdits` mode) can still be followed: >lua
   require("ai_inline_diff").setup_live_changes()
 <
 It watches the files open in Neovim. When one changes on disk and its
@@ -302,8 +302,15 @@ The agent changed a file without showing a review ~
    `~/.config/opencode/opencode.jsonc` and that the OpenCode prompt does
    not display the `auto` indicator. With OpenCode 2.x, run
    `opencode service restart` after changing it, since the background
-   server reads its configuration only when it starts.
-4. Run `:checkhealth claudecode`, `:checkhealth opencode` or
+   server reads its configuration only when it starts. An "Always allow"
+   answer is saved for the whole project and outlives the session: list
+   the saved rules with `opencode api GET /api/permission/saved` and remove
+   one with `opencode api DELETE /api/permission/saved/<id>`.
+4. For Claude Code, check that the status bar shows `manual mode on`
+   (mode `default`). `auto` and `acceptEdits` write edits without asking.
+   Set `permissions.defaultMode = "default"` in `~/.claude/settings.json`,
+   or press Shift+Tab during a session.
+5. Run `:checkhealth claudecode`, `:checkhealth opencode` or
    `:checkhealth antigravity-cli`.
 
 The message "diff could not be rendered" appears ~
