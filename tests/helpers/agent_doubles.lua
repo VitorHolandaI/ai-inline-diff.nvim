@@ -181,8 +181,8 @@ end
 
 --- OpenCode 2.x sends `{ id, type, data }` events. An edit permission carries
 --- one entry per file in data.metadata.files, each `{ file, patch, status }`
---- (from OpenCode 2.1.4's edit, write and patch tools). The server object has
---- no `cwd`, and the reply needs the session id. The 2.x daemon requires
+--- (edit, write and patch tools, OpenCode 2.1.4 to 2.3.0). The server object
+--- has no `cwd`, and the reply needs the session id. The 2.x daemon requires
 --- credentials that the autocmd does not carry, so like the real one,
 --- `new(url)` fails with 401 and only `connected` can answer.
 ---@param path string

@@ -20,7 +20,7 @@ end
 
 -- OpenCode 2.x events are `{ id, type, data }`; data.action names the
 -- permission and data.metadata.files holds `{ file, patch, status }` per file
--- (edit, write and patch tools in 2.1.4). Edits without a diff, like an
+-- (edit, write and patch tools, 2.1.4 to 2.3.0). Edits without a diff, like an
 -- edit whose oldString did not match, carry no metadata.
 ---@param event table
 ---@return AiInlineDiffOpencodeEdit?, string? reason it cannot be reviewed

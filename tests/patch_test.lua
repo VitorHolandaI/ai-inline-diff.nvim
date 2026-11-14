@@ -46,8 +46,8 @@ local cases = {
   { name = "letters in the header", patch = "@@ -1x +1 @@\n-b\n+B\n" },
   { name = "no hunk at all", patch = "", error = "No unified diff hunks" },
   {
-    -- OpenCode 2.1.4 builds patches with jsdiff, which adds an Index line and
-    -- an underline before the --- / +++ headers.
+    -- OpenCode 2.x (2.1.4 to 2.3.0) builds patches with jsdiff, which adds an
+    -- Index line and an underline before the --- / +++ headers.
     name = "jsdiff header from OpenCode 2.x",
     patch = table.concat({
       "Index: notes/a.md",

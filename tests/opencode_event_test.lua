@@ -1,7 +1,7 @@
 -- Run with: nvim -l tests/opencode_event_test.lua
 -- Checks lua/ai_inline_diff/opencode_event.lua on both event shapes: OpenCode
 -- 1.x `{ type, properties }` and 2.x `{ id, type, data }` (as opencode.nvim
--- main and OpenCode 2.1.4 send them), including the replies.
+-- main and OpenCode 2.1.4 to 2.3.0 send them), including the replies.
 
 local plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 package.path = plugin_root .. "/tests/?.lua;" .. package.path
