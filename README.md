@@ -37,10 +37,10 @@ and used with these versions:
 
 | Component            | Version                          |
 | -------------------- | -------------------------------- |
-| Neovim               | 0.12.5                           |
-| Claude Code CLI      | 2.1.282                          |
+| Neovim               | 0.12.6                           |
+| Claude Code CLI      | 2.1.325                          |
 | claudecode.nvim      | `main` at `2390c6e` (v0.3.0+53)  |
-| OpenCode CLI         | 2.1.4                            |
+| OpenCode CLI         | 2.3.0                            |
 | opencode.nvim        | `main` at `e7643e9`              |
 | Antigravity CLI      | `agy` 1.2.14                     |
 | antigravity-cli.nvim | `main` at `43d0d38`              |
