@@ -1,6 +1,8 @@
 -- Run with: nvim -l tests/location_test.lua
 -- Covers open_location() and bin/nvim-open-location against a child Neovim
--- laid out like a real session: editor window plus an agent terminal.
+-- laid out like a real session: editor window plus an agent terminal. Several
+-- locations at once go to one tab each (the default) or to splits, without
+-- moving focus out of the agent terminal.
 
 local plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 package.path = plugin_root .. "/tests/?.lua;" .. package.path
@@ -23,6 +25,15 @@ local function write_sample_file()
   end
   vim.fn.writefile(lines, path)
   return dir, path
+end
+
+-- A second file in the same directory, for calls that reach more than one.
+local function write_extra_file(dir, name)
+  local lines = {}
+  for i = 1, 40 do
+    lines[i] = name .. " line " .. i
+  end
+  vim.fn.writefile(lines, dir .. "/" .. name)
 end
 
 -- Editor on the left, terminal on the right, focus in terminal mode.
@@ -67,6 +78,34 @@ end
 
 local function open_location(nvim, ...)
   return nvim:lua("return { pcall(require('ai_inline_diff').open_location, ...) }", ...)
+end
+
+-- Every file window in every tab, in tab order, with what it shows.
+local function file_windows(nvim)
+  return nvim:lua([[
+    local ns = vim.api.nvim_get_namespaces().AiInlineDiffLocation
+    local out = {}
+    for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        if vim.bo[buf].buftype == "" and vim.api.nvim_buf_get_name(buf) ~= "" then
+          local highlighted = {}
+          for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(buf, ns or -1, 0, -1, { details = true })) do
+            for row = mark[2], mark[4].end_row - 1 do
+              highlighted[#highlighted + 1] = row + 1
+            end
+          end
+          out[#out + 1] = {
+            file = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(buf), ":t"),
+            tab = vim.api.nvim_tabpage_get_number(tab),
+            cursor = vim.api.nvim_win_get_cursor(win)[1],
+            highlighted = highlighted,
+          }
+        end
+      end
+    end
+    return out
+  ]])
 end
 
 local function test_opens_range_beside_terminal()
@@ -140,9 +179,13 @@ local function test_invalid_input_raises_with_value()
 end
 
 -- Starts the script as an agent would: from its own cwd, with $NVIM set.
-local function run_script(address, cwd, spec)
+local function run_script(address, cwd, ...)
+  local args = { script }
+  for _, spec in ipairs({ ... }) do
+    args[#args + 1] = spec
+  end
   local env = { NVIM = address, PATH = vim.env.PATH, HOME = vim.env.HOME }
-  local result = vim.system({ script, spec }, { cwd = cwd, env = env, clear_env = true, text = true }):wait()
+  local result = vim.system(args, { cwd = cwd, env = env, clear_env = true, text = true }):wait()
   return result.code, result.stdout .. result.stderr
 end
 
@@ -184,6 +227,79 @@ local function test_setup_puts_script_on_path()
   nvim:stop()
 end
 
+-- A bare path means "show me the file", so nothing is highlighted.
+local function test_bare_path_opens_without_highlight()
+  local _, path = write_sample_file()
+  local nvim = open_session(true)
+  open_location(nvim, path)
+  check("bare path opens the file", snapshot(nvim), {
+    shown = "sample.lua",
+    cursor = 1,
+    highlighted = {},
+    focus_in_terminal = true,
+    mode = "t",
+    windows = 2,
+  })
+  nvim:stop()
+end
+
+-- Several hits: one tab each by default, so the user can hop with gt.
+local function test_default_layout_puts_each_location_in_a_tab()
+  local dir = write_sample_file()
+  write_extra_file(dir, "other.lua")
+  local nvim = open_session(false)
+  local address = nvim:lua("return vim.fn.serverstart()")
+  local code = run_script(address, dir, "sample.lua:10-11", "other.lua:20")
+  check("tab script exit code", code, 0)
+  check("one tab per location", file_windows(nvim), {
+    { file = "sample.lua", tab = 2, cursor = 10, highlighted = { 10, 11 } },
+    { file = "other.lua", tab = 3, cursor = 20, highlighted = { 20 } },
+  })
+  check("tabs keep focus in the terminal", nvim:focus(), { in_terminal = true, mode = "t" })
+  code = run_script(address, dir, "--tab", "sample.lua:30")
+  check("second tab call reuses the tab", { code, #file_windows(nvim) }, { 0, 2 })
+  check("reused tab moves the cursor", file_windows(nvim)[1], {
+    file = "sample.lua",
+    tab = 2,
+    cursor = 30,
+    highlighted = { 30 },
+  })
+  nvim:stop()
+end
+
+local function test_splits_layout_opens_every_location_beside_terminal()
+  local dir = write_sample_file()
+  write_extra_file(dir, "other.lua")
+  local nvim = open_session(false)
+  local address = nvim:lua("return vim.fn.serverstart()")
+  local code = run_script(address, dir, "--vsplit", "sample.lua:10", "other.lua:20")
+  check("vsplit script exit code", code, 0)
+  check("vsplit shows both files in order", file_windows(nvim), {
+    { file = "sample.lua", tab = 1, cursor = 10, highlighted = { 10 } },
+    { file = "other.lua", tab = 1, cursor = 20, highlighted = { 20 } },
+  })
+  check("vsplit keeps focus in the terminal", nvim:focus(), { in_terminal = true, mode = "t" })
+  code = run_script(address, dir, "--split", "sample.lua:30", "other.lua:35")
+  check("split script exit code", code, 0)
+  check("split adds one more window per location", #file_windows(nvim), 4)
+  nvim:stop()
+end
+
+-- Nothing opens when any location is wrong, so a typo never half-applies.
+local function test_script_rejects_bad_layout_and_opens_nothing_on_a_bad_range()
+  local dir = write_sample_file()
+  write_extra_file(dir, "other.lua")
+  local nvim = open_session(false)
+  local address = nvim:lua("return vim.fn.serverstart()")
+  local code, output = run_script(address, dir, "--diagonal", "sample.lua:1")
+  check("bad layout exits 2", code, 2)
+  check("bad layout names the option", output:find("--diagonal", 1, true) ~= nil, true)
+  code = run_script(address, dir, "sample.lua:5", "other.lua:99")
+  check("bad range exits 1", code, 1)
+  check("bad range opens nothing", { #file_windows(nvim), nvim:focus() }, { 0, { in_terminal = true, mode = "t" } })
+  nvim:stop()
+end
+
 -- A shell write (sed -i, a Python script) skips the edit permission, so no
 -- review opens: agents prefer edit tools and announce any shell write.
 local function test_instructions_keep_file_changes_reviewable()
@@ -206,6 +322,10 @@ test_keeps_active_review_untouched()
 test_invalid_input_raises_with_value()
 test_script_opens_relative_path()
 test_script_reports_failures()
+test_bare_path_opens_without_highlight()
+test_default_layout_puts_each_location_in_a_tab()
+test_splits_layout_opens_every_location_beside_terminal()
+test_script_rejects_bad_layout_and_opens_nothing_on_a_bad_range()
 test_setup_puts_script_on_path()
 test_instructions_keep_file_changes_reviewable()
 recorder:finish()

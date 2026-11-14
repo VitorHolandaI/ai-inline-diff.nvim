@@ -1033,12 +1033,21 @@ function M.setup_terminal(opts)
 end
 
 --- Show lines of a file in an editor window, keeping focus where it is.
+--- Without `first_line` the file opens and nothing is highlighted.
 --- Example: `require("ai_inline_diff").open_location("lua/app.lua", 10, 25)`
 ---@param path string
----@param first_line integer
+---@param first_line integer?
 ---@param last_line integer?
 function M.open_location(path, first_line, last_line)
   require("ai_inline_diff.location").open(path, first_line, last_line)
+end
+
+--- Show several locations at once, one tab each or in splits.
+--- Example: `require("ai_inline_diff").open_locations({ { path = "a.lua", first_line = 10 } }, "tab")`
+---@param locations AiInlineDiffLocation[]
+---@param layout AiInlineDiffLayout?
+function M.open_locations(locations, layout)
+  require("ai_inline_diff.location").open_many(locations, layout)
 end
 
 --- Let agents run `nvim-open-location` from terminals opened afterwards.

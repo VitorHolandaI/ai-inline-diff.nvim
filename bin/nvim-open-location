@@ -1,41 +1,85 @@
 #!/bin/sh
-# Show a file range in the Neovim that owns this terminal, keeping focus in
-# the terminal. Usage: nvim-open-location path[:first[-last]]
+# Show file ranges in the Neovim that owns this terminal, keeping focus in
+# the terminal. Usage: nvim-open-location [--tab|--vsplit|--split] path[:first[-last]] ...
 set -eu
 
-if [ $# -ne 1 ]; then
-  echo "usage: nvim-open-location path[:first[-last]], e.g. src/app.lua:10-25" >&2
+usage() {
+  echo "usage: nvim-open-location [--tab|--vsplit|--split] path[:first[-last]] ..." >&2
+  echo "  e.g. nvim-open-location src/app.lua:10-25 src/parser.lua" >&2
   exit 2
+}
+
+fail() {
+  echo "nvim-open-location: $1" >&2
+  exit 2
+}
+
+layout=auto
+entries=
+count=0
+
+for arg in "$@"; do
+  case $arg in
+    --tab | --vsplit | --split)
+      if [ "$layout" != auto ]; then
+        fail "layout given more than once, expected at most one of --tab, --vsplit, --split"
+      fi
+      layout=${arg#--}
+      continue
+      ;;
+    -*)
+      fail "unknown option '$arg', expected --tab, --vsplit or --split"
+      ;;
+  esac
+
+  case $arg in
+    *:*) path=${arg%:*} range=${arg##*:} ;;
+    *) path=$arg range= ;;
+  esac
+  # The agent's cwd can differ from Neovim's, so resolve relative paths here.
+  case $path in
+    /*) ;;
+    *) path=$PWD/$path ;;
+  esac
+
+  # Vimscript single-quoted strings escape ' as ''.
+  quoted=$(printf '%s' "$path" | sed "s/'/''/g")
+  entry="{'path':'$quoted'"
+
+  if [ -n "$range" ]; then
+    first=${range%-*}
+    last=${range#*-}
+    case "$first:$last" in
+      :* | *: | *[!0-9:]*)
+        fail "invalid line range in '$arg', expected path:first or path:first-last"
+        ;;
+    esac
+    entry="$entry,'first':$first,'last':$last"
+  fi
+
+  entry="$entry}"
+  entries="${entries}${entries:+,}$entry"
+  count=$((count + 1))
+done
+
+if [ "$count" -eq 0 ]; then
+  usage
+fi
+if [ "$layout" = auto ]; then
+  # One hit reuses the nearest editor window; several get a tab each.
+  if [ "$count" -gt 1 ]; then
+    layout=tab
+  else
+    layout=smart
+  fi
 fi
 if [ -z "${NVIM:-}" ]; then
   echo "nvim-open-location: \$NVIM is empty; run this from a terminal inside Neovim" >&2
   exit 2
 fi
 
-spec=$1
-case $spec in
-  *:*) path=${spec%:*} range=${spec##*:} ;;
-  *) path=$spec range=1 ;;
-esac
-first=${range%-*}
-last=${range#*-}
-case "$first:$last" in
-  :* | *: | *[!0-9:]*)
-    echo "nvim-open-location: invalid line range in '$spec', expected path:first or path:first-last" >&2
-    exit 2
-    ;;
-esac
-
-# The agent's cwd can differ from Neovim's, so resolve relative paths here.
-case $path in
-  /*) ;;
-  *) path=$PWD/$path ;;
-esac
-# Vimscript single-quoted strings escape ' as ''.
-quoted=$(printf '%s' "$path" | sed "s/'/''/g")
-
 result=$(nvim --server "$NVIM" --remote-expr \
-  "luaeval('require(\"ai_inline_diff.location\").open_for_remote(_A[1], _A[2], _A[3])', ['$quoted', $first, $last])")
+  "luaeval('require(\"ai_inline_diff.location\").open_for_remote(_A[1])', [{'layout':'$layout','locations':[$entries]}])")
 printf '%s\n' "$result"
 case $result in
   opened*) exit 0 ;;

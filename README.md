@@ -274,20 +274,33 @@ terminal, so you can keep talking while you read.
    nvim-open-location src/parser.lua:40-72
    ```
 
+   A bare `src/parser.lua` opens the file without highlighting anything.
+   Several hits can go in one call, with a layout:
+
+   ```sh
+   nvim-open-location --tab src/parser.lua:40 src/lexer.lua:12
+   nvim-open-location --vsplit src/parser.lua:40 src/parser.lua:88
+   ```
+
 4. Neovim sets `$NVIM` in every terminal it starts to the address of its own
    server. The script makes the path absolute, because the agent's working
    directory can differ from Neovim's, and asks that server to run
    `open_for_remote()` through `nvim --server $NVIM --remote-expr`.
-5. Inside Neovim, `location.lua` loads the file and picks a window. It
-   prefers one that already shows the file, then the nearest editor window in
-   the current tab. It skips a window with a pending review, because
-   replacing that buffer would reject the edit, and opens a split beside the
-   terminal when no window fits. The cursor goes to the first line, centered,
-   and the range is highlighted. The current window never changes.
-6. The script prints Neovim's reply. It exits with 0 when the range is shown,
-   1 when Neovim refused it (missing file or a line outside the file) and 2
-   on bad arguments or an empty `$NVIM`. On a failure the agent reads the
-   message and fixes the path or the range.
+5. Inside Neovim, `location.lua` loads every file first and checks every
+   range, so one bad path opens nothing. It then places them by layout:
+   `smart` (the default for a single location) prefers a window that already
+   shows the file, then the nearest editor window in the current tab, and
+   splits beside the terminal when no window fits. `tab` gives each location
+   its own tab and returns right away, so you can hop with `gt`; `vsplit` and
+   `split` open one split per location. A window with a pending review is
+   never replaced, because that would reject the edit. The cursor goes to the
+   first line, centered, and the range is highlighted. Focus never leaves the
+   terminal.
+6. The script prints Neovim's reply, naming each location and the layout. It
+   exits with 0 when everything is shown, 1 when Neovim refused a location
+   (missing file or a line outside the file) and 2 on bad arguments or an
+   empty `$NVIM`. On a failure the agent reads the message and fixes the path
+   or the range.
 
 The highlight goes away when you enter Insert mode in that buffer or when the
 agent shows another range.
@@ -312,7 +325,9 @@ opts.terminal_cmd = "claude --append-system-prompt-file " .. vim.fn.shellescape(
 that path.
 
 You can also call it from Lua:
-`require("ai_inline_diff").open_location(path, first, last)`.
+`require("ai_inline_diff").open_location(path, first, last)`, where `first`
+is optional, or `require("ai_inline_diff").open_locations(locations, layout)`
+for several at once.
 
 ## Reviewing an edit
 

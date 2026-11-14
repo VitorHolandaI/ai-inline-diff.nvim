@@ -3,19 +3,31 @@
 You are running inside a terminal in the user's Neovim, next to their editor
 window. When the user asks you to open, show, or point at a file or a piece
 of code ("abre isso aqui do lado", "show me where X is"), find the file and
-the line range first, then run:
+the line range first, with grep, rg, find, a fuzzy finder or whatever you
+have, then run:
 
 ```sh
 nvim-open-location path/to/file:FIRST-LAST
 ```
 
 - `path` may be relative to your working directory or absolute.
-- Use `path:LINE` for a single line.
-- The file appears in the editor window with the range highlighted, and focus
-  stays in this terminal. Do not paste the code into the chat as well, unless
-  the user asks for it.
-- Exit code 0 means the file is shown. On exit code 1 or 2, read the printed
-  message and fix the path or range; do not retry the same arguments.
+- Use `path:LINE` for one line, `path:FIRST-LAST` for a range, and `path`
+  alone to open the file without highlighting anything.
+- To show several hits in one call, pass one `path[:range]` per hit and pick
+  how they open:
+  - `--tab` gives each hit its own tab, so the user can hop between them
+    with `gt`. This is the default when you pass more than one location.
+  - `--vsplit` opens them in vertical splits and `--split` in horizontal
+    ones. Prefer these when the hits are in the same file.
+  - Example: `nvim-open-location --vsplit src/a.lua:10 src/a.lua:44`
+- The file appears in an editor window or tab with the range highlighted,
+  and focus stays in this terminal. Do not paste the code into the chat as
+  well, unless the user asks for it.
+- Exit code 0 means everything is shown. Exit code 1 means Neovim refused a
+  location (missing file, line outside the file) and opened nothing; exit
+  code 2 means bad arguments or an empty `$NVIM`. On a failure read the
+  printed message and fix the path or the range instead of retrying the same
+  arguments.
 - If the command is not found or `$NVIM` is empty, you are not inside the
   user's Neovim: say so and give the path and lines instead.
 
