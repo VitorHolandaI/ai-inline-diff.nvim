@@ -2,8 +2,8 @@
 
 The Lua module that Neovim loads for `require("ai_inline_diff")`. It gives the
 user's configuration three things: an inline review that intercepts edits from
-the agent plugins (claudecode.nvim, opencode.nvim, antigravity-cli.nvim),
-terminal helpers for moving between the editor and the agents' terminals, and
+the agent plugins (claudecode.nvim, opencode.nvim, antigravity-cli.nvim) and
+from agy's PreToolUse hook (`../../bin/agy-review-hook.lua`), terminal helpers for moving between the editor and the agents' terminals, and
 a way for an agent to show a file range in the editor.
 
 - `init.lua` is the public entry point and the review engine. It replaces
@@ -17,6 +17,23 @@ a way for an agent to show a file range in the editor.
   `open_location()`, `setup_open_location()` and
   `open_location_instructions()` only forward to `terminal.lua` and
   `location.lua`.
+  `antigravity_hook_start()` and `antigravity_hook_poll()` are what the agy
+  hook script calls over `$NVIM`; they hand off to `agy_hook.lua`, built at
+  load time with `open_review()`, `resolve_review()` and `save_wait` as its
+  dependencies. `antigravity_hook_command()` gives the `command` line for
+  agy's `hooks.json`.
+- `agy_hook.lua` turns agy's `edit_file`/`write_file` calls into reviews.
+  `new(deps)` returns a queue with `start(raw_payload)` and `poll(id)`:
+  `start()` decodes the payload, answers `{ reply = allow }` at once when
+  there is nothing to review (another tool, a target not in the file, an
+  agy artifact), and otherwise queues the request. One request at a time
+  waits for unsaved edits (`save_wait`) and then opens a review through the
+  injected `open_review()`; the others wait until no review is open.
+  `proposed_text()` rebuilds the file agy would write (edit_file replaces
+  every match, as agy does) and `accepted_reply()` maps the accepted text
+  to `allow`, or to `allow` plus agy's `overwrite` when it differs from the
+  proposal. A timer closes the review when the script stops polling, which
+  is what happens when agy kills the hook at its timeout.
 - `opencode_event.lua` reads an OpenCode edit permission request from
   either event shape, 1.x `{ type, properties }` or 2.x `{ id, type, data }`
   with the diff in `data.metadata.files`, and answers with `permit()`, which
@@ -95,6 +112,7 @@ a way for an agent to show a file range in the editor.
 
 Flow: the user config calls `setup_*()` on `init.lua` after each agent plugin
 is set up. Agent edits then reach `open_review()` through the adapter for
-that agent; terminal focus goes through the autocmd in `terminal.lua`; and an
+that agent, or for agy 1.5 through `bin/agy-review-hook.lua`, which calls
+`antigravity_hook_start()` and then polls `antigravity_hook_poll()`; terminal focus goes through the autocmd in `terminal.lua`; and an
 agent that runs `nvim-open-location` lands in `location.lua` through
 `--remote-expr`.

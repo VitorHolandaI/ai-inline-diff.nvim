@@ -20,14 +20,18 @@ You need Neovim 0.12 or newer. That release renamed `vim.diff()` to
 `vim.text.diff()` and the `buffer` option of `vim.keymap.set()` to `buf`,
 and the plugin uses the new names.
 
-You also need the Neovim plugin for each agent you use. This plugin never
-talks to the agents directly; it hooks into their plugins.
+For Claude Code and OpenCode you also need the agent's Neovim plugin. This
+plugin does not talk to those agents directly; it hooks into their plugins.
+Antigravity 1.5 and newer needs no Neovim plugin for reviews: `agy` itself
+runs this plugin's hook before every edit (see
+[Antigravity: the review hook](#antigravity-the-review-hook)).
 
-| Agent       | Plugin                                                                                  | Setup call            |
-| ----------- | --------------------------------------------------------------------------------------- | --------------------- |
-| Claude Code | [coder/claudecode.nvim](https://github.com/coder/claudecode.nvim)                       | `setup_claude()`      |
-| OpenCode    | [nickjvandyke/opencode.nvim](https://github.com/nickjvandyke/opencode.nvim)             | `setup_opencode()`    |
-| Antigravity | [McEazy2700/antigravity-cli.nvim](https://github.com/McEazy2700/antigravity-cli.nvim)   | `setup_antigravity()` |
+| Agent           | Plugin                                                                                  | Setup                                        |
+| --------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Claude Code     | [coder/claudecode.nvim](https://github.com/coder/claudecode.nvim)                       | `setup_claude()`                             |
+| OpenCode        | [nickjvandyke/opencode.nvim](https://github.com/nickjvandyke/opencode.nvim)             | `setup_opencode()`                           |
+| Antigravity 1.5 | none                                                                                    | a `PreToolUse` entry in agy's `hooks.json`   |
+| Antigravity 1.2 | [McEazy2700/antigravity-cli.nvim](https://github.com/McEazy2700/antigravity-cli.nvim)   | `setup_antigravity()`                        |
 
 ### Versions in use
 
@@ -42,8 +46,13 @@ and used with these versions:
 | claudecode.nvim      | `main` at `2390c6e` (v0.3.0+53)  |
 | OpenCode CLI         | 2.3.0                            |
 | opencode.nvim        | `main` at `e7643e9`              |
-| Antigravity CLI      | `agy` 1.2.14                     |
+| Antigravity CLI      | `agy` 1.5.17                     |
 | antigravity-cli.nvim | `main` at `43d0d38`              |
+
+agy 1.5 dropped the IDE companion that antigravity-cli.nvim's diffs went
+through, so with 1.5.17 reviews come only from the hook, and
+antigravity-cli.nvim just runs the terminal. `setup_antigravity()` was last
+used with `agy` 1.2.14.
 
 OpenCode 2.x needs opencode.nvim's `main` branch, which has no release yet,
 so the spec below pins a commit. The plugin also still reads OpenCode 1.x
@@ -177,6 +186,73 @@ opencode api DELETE /api/permission/saved/<id>
 `opencode api GET /api/permission/saved` only lists the rules of one
 project, and not always the one you ran it from, so read the ids from the
 database.
+
+#### Antigravity: the review hook
+
+agy 1.5 writes edits without asking in every mode, `default` included, and
+its ACP server (`agy acp`) only reports the diff after writing. What it does
+offer is lifecycle hooks: a `PreToolUse` hook runs before each tool call and
+answers `allow` or `deny`, and may rewrite the call's arguments. The plugin's
+`bin/agy-review-hook.lua` is that hook. For `edit_file` and `write_file` it
+asks the Neovim at `$NVIM` to open the usual review and holds agy until you
+answer:
+
+| In the review                      | agy gets                                              |
+| ---------------------------------- | ----------------------------------------------------- |
+| accept as proposed                 | `allow`                                               |
+| accept after editing or `<M-x>`    | `allow`, with the arguments rewritten to your version |
+| reject                             | `deny`, with "The user rejected this edit…"           |
+
+agy writes the file itself after `allow`, so the disk stays untouched while
+the review is open. Add the hook to `~/.gemini/antigravity-cli/hooks.json`:
+
+```json
+{
+  "ai-inline-diff": {
+    "PreToolUse": [
+      {
+        "matcher": "edit_file|write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nvim -l ~/.local/share/nvim/lazy/ai-inline-diff.nvim/bin/agy-review-hook.lua",
+            "timeout": 1800
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`:lua print(require("ai_inline_diff").antigravity_hook_command())` prints the
+`command` for wherever the plugin is installed. agy reads `hooks.json` when
+a session starts, so restart open sessions.
+
+Keep the file global rather than in a project's `.agents/hooks.json`. After
+a rejection the agent, which can read its workspace, tends to open the
+hook's files and spend minutes working out why the edit was blocked.
+
+What to expect, checked with `agy` 1.5.17:
+
+- The hook holds edits in every mode: `default`, `auto`, `accept-edits`,
+  `--dangerously-skip-permissions`, and the interactive TUI as well as `-p`.
+- `timeout` is in seconds, and the default of 30 is too short to read a
+  diff. When it runs out, agy kills the hook and the edit fails without
+  touching the file. Neovim then closes the review and says agy stopped
+  waiting.
+- agy runs one hook at a time, so parallel edits arrive one after another.
+  An edit that comes while another review is open waits for it.
+- `edit_file` replaces every match of its target, and the review shows
+  exactly that.
+- `write_file` calls that save agy's own plans and notes (they carry
+  `ArtifactMetadata` and live under `~/.gemini/antigravity-cli/brain/`) are
+  allowed without a review.
+- Outside Neovim (`$NVIM` empty), or when Neovim does not have this plugin
+  loaded, the hook answers `allow`, so agy behaves as it does without the
+  hook. The hook must always print a decision: an empty answer or a crash
+  makes agy block the edit.
+- Shell commands (`run_command`) are not reviewed, as with the other agents.
 
 #### Both agents: edit tools first, and a notice for shell edits
 
@@ -411,7 +487,8 @@ terminal.
 
 The plugin only sees edits that the agent sends to Neovim for approval.
 With Claude Code that is an `openDiff` request, with OpenCode an `edit`
-permission request, and with Antigravity a diff it opens. An edit the agent
+permission request, and with Antigravity 1.5 an `edit_file` or `write_file`
+call held by its hook (with 1.2, a diff it opens). An edit the agent
 makes by running a shell command, such as `sed -i` or `echo >> file`, goes
 straight to disk and never shows up as a review. Neovim's `'autoread'`, on
 by default, reloads the buffer once it notices the change. The instruction
@@ -437,7 +514,12 @@ nvim -l tests/deprecated_api_test.lua
 nvim -l tests/opencode_event_test.lua
 nvim -l tests/save_wait_test.lua
 nvim -l tests/live_changes_test.lua
+nvim -l tests/agy_hook_test.lua
 ```
+
+`agy_hook_test.lua` runs `bin/agy-review-hook.lua` as agy would, with a JSON
+payload on stdin and `$NVIM` pointing at a child Neovim, then types into the
+review and checks the decision the hook prints.
 
 `scenarios_test.lua` replays each folder in `tests/scenarios/`. A simulated
 agent proposes an edit, the scenario's keys are typed into the review, and

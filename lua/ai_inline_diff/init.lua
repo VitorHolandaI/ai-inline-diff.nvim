@@ -1025,6 +1025,42 @@ function M.setup_antigravity()
   end
 end
 
+local agy_hook = require("ai_inline_diff.agy_hook").new({
+  open_review = open_review,
+  has_review = function()
+    return current_review ~= nil and reviews[current_review] ~= nil
+  end,
+  close_review = function(id)
+    resolve_review(id, false, false)
+  end,
+  read_file = read_file,
+  find_loaded_buffer = find_loaded_buffer,
+  when_saved = save_wait.when_saved,
+})
+
+--- Called by bin/agy-review-hook.lua over $NVIM with agy's PreToolUse
+--- payload. Returns `{ id }` while the edit waits for review, or `{ reply }`.
+---@param raw_payload string
+---@return table
+function M.antigravity_hook_start(raw_payload)
+  return agy_hook:start(raw_payload)
+end
+
+--- The hook's decision for review `id`, or nil while it is still open.
+---@param id string
+---@return table?
+function M.antigravity_hook_poll(id)
+  return agy_hook:poll(id)
+end
+
+--- The `command` to put in agy's hooks.json, with this install's path.
+--- Example: `:lua print(require("ai_inline_diff").antigravity_hook_command())`
+---@return string
+function M.antigravity_hook_command()
+  local plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h:h")
+  return "nvim -l " .. vim.fn.shellescape(plugin_root .. "/bin/agy-review-hook.lua")
+end
+
 --- Enter agent terminals in terminal mode and leave them with <C-w>.
 --- Example: `require("ai_inline_diff").setup_terminal({ window_keys = false })`
 ---@param opts AiInlineDiffTerminalOpts?

@@ -81,8 +81,15 @@ That is also what OpenCode writes when you accept: its edit and write
 tools prepare the new content before they ask, and write it unchanged.
 
 If the patch cannot be rebuilt, no review opens and the permission stays
-pending in OpenCode's terminal. Antigravity calls `antigravity-cli.diff.open()`
-with the full proposed file, which `setup_antigravity()` replaces.
+pending in OpenCode's terminal. Antigravity 1.2 calls
+`antigravity-cli.diff.open()` with the full proposed file, which
+`setup_antigravity()` replaces.
+
+agy 1.5 sends nothing to Neovim, but it runs `bin/agy-review-hook.lua`
+before each `edit_file` or `write_file` call. The script passes the call to
+`antigravity_hook_start()`, and `agy_hook.proposed_text()` rebuilds the
+file: `Content` for `write_file`, and for `edit_file` the file on disk with
+every match of `Target` replaced by `Replacement`, as agy does it.
 
 If the file is open in Neovim with unsaved changes, every adapter waits
 here instead of rejecting the edit. `save_wait.when_saved()`
@@ -231,6 +238,14 @@ end)
 send_diff_response("ide/diffAccepted", filePath)
 ```
 
+agy 1.5 also writes the file itself. The hook script polls
+`antigravity_hook_poll()` until the review ends and prints the decision,
+built by `agy_hook.accepted_reply()`: `allow` when you accepted the
+proposal as it was, or `allow` with `overwrite` when you edited it or
+dropped a change. `overwrite` replaces the call's arguments, so for
+`edit_file` the `Target` becomes the whole file on disk and the
+`Replacement` your version of it. A rejection prints `deny`.
+
 OpenCode applies its own patch. The plugin only answers the permission
 request with `once` or `reject` through `opencode_event.permit()`
 (`init.lua:541`), which calls `server:permit(id, choice)` on 1.x and
@@ -248,3 +263,5 @@ the real claudecode.nvim and antigravity-cli.nvim, and checks the final
 text byte for byte. `tests/patch_test.lua` covers how OpenCode patches are
 rebuilt, `tests/claude_adapter_test.lua` covers the reply to Claude, and
 `tests/review_test.lua` covers selection and the keys in each mode.
+`tests/agy_hook_test.lua` runs agy's hook script against a child Neovim
+and checks the decision it prints for each way a review can end.

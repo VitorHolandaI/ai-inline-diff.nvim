@@ -50,6 +50,20 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
     real 2.x daemon, it is reachable only as `opencode.server.connected`;
     `new(url)` fails with 401. `outcome()` reports what the agent
     would receive.
+- `agy_hook_test.lua` runs `../bin/agy-review-hook.lua` the way agy does:
+  `nvim -l` with a PreToolUse payload on stdin and `$NVIM` pointing at a
+  child Neovim, then types into the review and reads the decision it
+  prints. It covers accept (`allow`), reject (`deny`), an edited review and
+  a dropped change (`allow` with `overwrite` holding the whole file), an
+  `edit_file` target that occurs twice, a new file from `write_file`, calls
+  that pass at once (another tool, a target not in the file, an agy
+  artifact), a second edit waiting for the first review, the review closing
+  after agy kills the hook, an empty `$NVIM`, a payload that is not JSON
+  (`deny` quoting it), a relative `Path` resolved against the agent's cwd,
+  a review that waits for unsaved text to be saved, and
+  `antigravity_hook_command()`. `accepted_reply()` and `proposed_text()`
+  are also called directly for an edited `write_file`, an accept that
+  brings the file back to its original text, and an empty `Target`.
 - `opencode_event_test.lua` calls `../lua/ai_inline_diff/opencode_event.lua`
   directly with 1.x and 2.x events: edits, other permissions, 2.x edits
   without a diff or over two files, replies, the `permit()` arguments for
@@ -83,8 +97,9 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   keymap.
 - `lint.lua` is not a `*_test.lua` file, so `coverage.lua` does not run it.
   It runs lua-language-server on `../lua/` with a config written per run
-  (Neovim's type stubs live in `$VIMRUNTIME`), stylua with
-  `../stylua.toml` and `../.styluaignore`, and shellcheck on
+  (Neovim's type stubs live in `$VIMRUNTIME`), stylua on `../lua/`, `./`
+  and `../bin/agy-review-hook.lua` with `../stylua.toml` and
+  `../.styluaignore`, and shellcheck on
   `../bin/nvim-open-location`, and fails on any finding or missing tool.
 - `coverage.lua` runs every `*_test.lua` with `AI_INLINE_DIFF_COVERAGE_DIR`
   set. `helpers/embedded_nvim.lua` sees the variable and loads
@@ -110,6 +125,7 @@ nvim -l tests/deprecated_api_test.lua
 nvim -l tests/opencode_event_test.lua
 nvim -l tests/save_wait_test.lua
 nvim -l tests/live_changes_test.lua
+nvim -l tests/agy_hook_test.lua
 nvim -l tests/lint.lua
 nvim -l tests/coverage.lua --missing
 ```

@@ -2,7 +2,8 @@
 -- Runs the three static checks the project keeps at zero findings:
 -- - lua-language-server --check on lua/: types from ---@ annotations,
 --   possible nil, deprecated Neovim API, unknown fields
--- - stylua --check on lua/ and tests/ (../stylua.toml, ../.styluaignore)
+-- - stylua --check on lua/, tests/ and bin/agy-review-hook.lua
+--   (../stylua.toml, ../.styluaignore)
 -- - shellcheck on bin/nvim-open-location
 -- Each tool is taken from $PATH or from Mason's bin directory. A missing tool
 -- fails the run, so a clean result always means all three ran.
@@ -56,8 +57,12 @@ end
 local function check_stylua()
   local stylua = require_tool("stylua", ":MasonInstall stylua or pacman -S stylua")
   if stylua then
-    local result = run({ stylua, "--check", "lua", "tests" })
-    report("stylua: lua/ and tests/ formatted", result.code == 0, result.stdout .. result.stderr)
+    local result = run({ stylua, "--check", "lua", "tests", "bin/agy-review-hook.lua" })
+    report(
+      "stylua: lua/, tests/ and bin/agy-review-hook.lua formatted",
+      result.code == 0,
+      result.stdout .. result.stderr
+    )
   end
 end
 

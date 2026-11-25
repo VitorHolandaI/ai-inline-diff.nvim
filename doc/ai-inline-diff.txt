@@ -34,13 +34,15 @@ Claude and Antigravity proposals are editable before acceptance. OpenCode
 proposals are read-only because its permission protocol accepts or rejects
 the original patch as a whole.
 
-It needs Neovim 0.12 or newer. The plugin never talks to the agents
-directly. It hooks into each agent's Neovim plugin, so those plugins must be
-installed and set up first:
+It needs Neovim 0.12 or newer. For Claude Code and OpenCode the plugin
+hooks into the agent's Neovim plugin, so that plugin must be installed and
+set up first. Antigravity 1.5 runs this plugin's hook itself instead
+(|ai-inline-diff-antigravity-hook|):
 
-  Claude Code    coder/claudecode.nvim
-  OpenCode       nickjvandyke/opencode.nvim
-  Antigravity    McEazy2700/antigravity-cli.nvim
+  Claude Code       coder/claudecode.nvim
+  OpenCode          nickjvandyke/opencode.nvim
+  Antigravity 1.5   no plugin, a PreToolUse entry in agy's hooks.json
+  Antigravity 1.2   McEazy2700/antigravity-cli.nvim
 
                                                     *ai-inline-diff-versions*
 The plugin replaces internal functions of those plugins and listens to
@@ -51,8 +53,12 @@ their events, so a new release can break it. Versions in use:
   claudecode.nvim        main at 2390c6e (v0.3.0+53)
   OpenCode CLI           2.3.0
   opencode.nvim          main at e7643e9
-  Antigravity CLI        agy 1.2.14
+  Antigravity CLI        agy 1.5.17
   antigravity-cli.nvim   main at 43d0d38
+
+agy 1.5 dropped the IDE companion that antigravity-cli.nvim's diffs used, so
+reviews come only from the hook. |ai-inline-diff-setup-antigravity| was last
+used with agy 1.2.14.
 
 OpenCode 2.x needs opencode.nvim's `main` branch, which has no release yet.
 The plugin also reads OpenCode 1.x events, with opencode.nvim v1.0.2.
@@ -84,8 +90,28 @@ own setup:
 <
                                             *ai-inline-diff-setup-antigravity*
 `require("ai_inline_diff").setup_antigravity()`
-    Replaces `antigravity-cli.diff`. Each diff Antigravity opens becomes an
-    inline review.
+    Replaces `antigravity-cli.diff`. Each diff Antigravity 1.2 opens becomes
+    an inline review. agy 1.5 opens none; use the hook below.
+
+                                             *ai-inline-diff-antigravity-hook*
+Antigravity 1.5 edits without asking in every mode. A `PreToolUse` hook runs
+before each tool call, so `bin/agy-review-hook.lua` holds `edit_file` and
+`write_file` until the review in the Neovim at `$NVIM` ends. Accepting
+answers "allow" (with the arguments rewritten when you edited the review or
+dropped a change), rejecting answers "deny", and agy then writes or not.
+Add it to `~/.gemini/antigravity-cli/hooks.json`: >json
+  { "ai-inline-diff": { "PreToolUse": [ { "matcher": "edit_file|write_file",
+    "hooks": [ { "type": "command", "timeout": 1800,
+    "command": "nvim -l /path/to/ai-inline-diff.nvim/bin/agy-review-hook.lua"
+  } ] } ] } }
+<
+`require("ai_inline_diff").antigravity_hook_command()` returns the `command`
+for this install. `timeout` is in seconds (agy's default is 30). When it
+runs out agy kills the hook, the edit fails, and Neovim closes the review.
+Edits arrive one at a time; one that comes during another review waits.
+agy's own plans and notes (`ArtifactMetadata`) pass without a review, and
+so does everything when `$NVIM` is empty. Keep the file global, not in a
+project's `.agents/`, or a rejected agent tends to read the hook's files.
 
 Two more setup functions are independent of the review:
 |ai-inline-diff-terminal| for agent terminals and
@@ -132,8 +158,9 @@ itself: it is accepted with the kept changes, or rejected when every change
 was dropped. Kept changes show a "✓" sign. OpenCode reviews are read-only,
 so ALT-Y and ALT-X only show a warning there.
 
-Only edits that the agent sends to Neovim for approval are reviewed. An
-edit made by a shell command, such as `sed -i`, goes straight to disk.
+Only edits that the agent sends to Neovim for approval, or that agy's hook
+holds, are reviewed. An edit made by a shell command, such as `sed -i`, goes
+straight to disk.
 
                                                  *ai-inline-diff-live-changes*
 Edits written without asking (OpenCode "Always allow", Claude Code in
@@ -153,6 +180,7 @@ agent to the file on disk.
 Only one inline review is active at a time. A new Claude review rejects an
 older pending review before it opens. A new OpenCode request is rejected when
 another review is active, so its permission request does not remain pending.
+An Antigravity hook request waits until the active review ends.
 
 ==============================================================================
 4. AGENT COMMANDS                                    *ai-inline-diff-commands*
