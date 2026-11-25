@@ -288,6 +288,79 @@ local function test_key_hint_replaces_itself_and_closes_with_the_review()
   nvim:stop()
 end
 
+-- Focus is often back in the agent's terminal when a review opens; Alt-a
+-- there used to reach the agent and leave the review waiting.
+local function test_alt_a_and_alt_r_answer_from_the_agent_terminal()
+  for _, case in ipairs({ { key = "<M-a>", reply = "ide/diffAccepted" }, { key = "<M-r>", reply = "ide/diffRejected" } }) do
+    local path = write_original_file()
+    local nvim = open_session(path)
+    propose(nvim, path, edited_text({ [3] = "three" }))
+    nvim:input("<Esc><C-w>l")
+    check(case.key .. ": focus is in the terminal", nvim:lua("return vim.bo.buftype"), "terminal")
+    nvim:input(case.key)
+    vim.wait(200)
+    local state = review_state(nvim)
+    check(case.key .. " from the terminal answers the review", state.replies, { case.reply })
+    check(
+      case.key .. " from the terminal closes the review",
+      nvim:lua(
+        "return #vim.tbl_filter(function(b) return vim.b[b].ai_inline_diff_id ~= nil end, vim.api.nvim_list_bufs())"
+      ),
+      0
+    )
+    check(case.key .. ": focus stays in the terminal", nvim:lua("return vim.bo.buftype"), "terminal")
+    nvim:stop()
+  end
+end
+
+-- Outside a review the keys belong to the terminal again, including a map
+-- the user had before.
+local function test_terminal_keys_are_released_after_the_review()
+  local path = write_original_file()
+  local nvim = open_session(path)
+  nvim:lua("vim.keymap.set('t', '<M-r>', '<Cmd>let g:user_alt_r = 1<CR>')")
+  propose(nvim, path, edited_text({ [3] = "three" }))
+  check("review maps Alt-a in terminals", nvim:lua("return vim.fn.maparg('<M-a>', 't') ~= ''"), true)
+  nvim:input("<M-a>")
+  vim.wait(200)
+  check("Alt-a is free in terminals again", nvim:lua("return vim.fn.maparg('<M-a>', 't')"), "")
+  check(
+    "the user's own Alt-r map is back",
+    nvim:lua("return vim.fn.maparg('<M-r>', 't')"),
+    "<Cmd>let g:user_alt_r = 1<CR>"
+  )
+  nvim:stop()
+end
+
+-- <leader>aa calls :AntigravityDiffAccept. With no review open it must say
+-- so plainly, and point at live-change marks when the buffer has them.
+local function test_accept_command_without_a_review_explains()
+  local path = write_original_file()
+  local nvim = open_session(path)
+  nvim:input("<C-\\><C-n><C-w>h")
+  nvim:lua([[
+    _G.notices = {}
+    vim.notify = function(message, level) table.insert(_G.notices, { message = message, level = level }) end
+  ]])
+  nvim:lua("vim.cmd.AntigravityDiffAccept()")
+  local notice = nvim:lua("return _G.notices[1]")
+  check("no review: says none is open", (notice.message or ""):find("No AI review is open", 1, true) ~= nil, true)
+  check("no review: a warning, not an error", notice.level, vim.log.levels.WARN)
+
+  nvim:lua("require('ai_inline_diff').setup_live_changes()")
+  vim.wait(200)
+  vim.fn.writefile(vim.split(edited_text({ [2] = "two" }), "\n", { trimempty = true }), path)
+  vim.wait(700)
+  nvim:lua("_G.notices = {}; vim.cmd.AntigravityDiffAccept()")
+  local marked = nvim:lua("return _G.notices[#_G.notices]")
+  check(
+    "live marks: says the agent already wrote them",
+    (marked.message or ""):find("already wrote", 1, true) ~= nil,
+    true
+  )
+  nvim:stop()
+end
+
 test_opens_with_first_change_selected()
 test_key_hint_lasts_a_minute_and_fits_the_agent()
 test_navigation_selects_each_change()
@@ -298,4 +371,7 @@ test_alt_r_rejects_from_insert()
 test_da_in_visual_accepts_instead_of_deleting()
 test_reload_of_agent_write_is_not_stale()
 test_key_hint_replaces_itself_and_closes_with_the_review()
+test_alt_a_and_alt_r_answer_from_the_agent_terminal()
+test_terminal_keys_are_released_after_the_review()
+test_accept_command_without_a_review_explains()
 recorder:finish()

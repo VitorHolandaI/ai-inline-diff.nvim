@@ -44,7 +44,7 @@ and used with these versions:
 | Neovim               | 0.12.6                           |
 | Claude Code CLI      | 2.1.325                          |
 | claudecode.nvim      | `main` at `2390c6e` (v0.3.0+53)  |
-| OpenCode CLI         | 2.3.0                            |
+| OpenCode CLI         | 2.4.1                            |
 | opencode.nvim        | `main` at `e7643e9`              |
 | Antigravity CLI      | `agy` 1.5.17                     |
 | antigravity-cli.nvim | `main` at `43d0d38`              |
@@ -186,6 +186,15 @@ opencode api DELETE /api/permission/saved/<id>
 `opencode api GET /api/permission/saved` only lists the rules of one
 project, and not always the one you ran it from, so read the ids from the
 database.
+
+These rules come back easily. All 19 projects that had one on 2026-11-25
+had saved it after a cleanup a month earlier. OpenCode shows its own
+permission box in its terminal at the same time as the review in Neovim,
+and in that box `l` or Right selects "Always allow" and two Enters confirm
+it, so typing a sentence into the terminal while the box is up is enough.
+Answer reviews with `<M-a>`/`<M-r>`, which work from that terminal too
+while a review is open (see [Reviewing an edit](#reviewing-an-edit)), and
+leave OpenCode's box alone.
 
 #### Antigravity: the review hook
 
@@ -431,6 +440,12 @@ accepting or rejecting closes it.
 `<M-a>` is Vim's notation for Alt-a, and the same goes for the other `<M-…>`
 keys; the in-editor hint spells them as `Alt-a`.
 
+While a review is open, `<M-a>` and `<M-r>` also work in Terminal mode, in
+any terminal. Focus is often back in the agent's terminal by the time a
+review opens, and there the keys used to reach the agent and leave the
+review waiting. When the review ends they belong to the terminal again,
+and a global Terminal-mode map you had for them is restored.
+
 `<M-a>` and `<M-r>` cover the whole edit, even when only one change is
 selected. To decide change by change, use `<M-y>` to keep the selected
 change and `<M-x>` to put its original lines back. Either one moves the
@@ -471,7 +486,15 @@ Each such write also leaves a message that outlasts the marks:
 
 ```text
 Agent changed docs/notes.md without a review: +2 -1 lines
+It did not ask first: a saved OpenCode "Always allow",
+Claude in auto mode, or a shell command.
+See :help ai-inline-diff-unreviewed
 ```
+
+The marks look like a review, but there is nothing to accept: the file is
+already written. `:AntigravityDiffAccept`, which antigravity-cli.nvim's
+suggested `<leader>aa` mapping calls, says so instead of failing with "Not
+in a diff buffer", and `u` undoes the change.
 
 It goes through `vim.notify`, so it shows in the notification history
 (`:messages`, or your notifier's history: `<leader>n` in LazyVim). The

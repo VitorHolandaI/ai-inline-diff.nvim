@@ -58,4 +58,41 @@ function M.map(buf, actions)
   end
 end
 
+---@param lhs string
+---@return table? the global Terminal-mode map for `lhs`, as mapset() takes it
+local function global_terminal_map(lhs)
+  for _, map in ipairs(vim.api.nvim_get_keymap("t")) do
+    if map.lhs == lhs then
+      return map
+    end
+  end
+end
+
+--- While a review is open, <M-a>/<M-r> in any terminal answer it: focus is
+--- often back in the agent's terminal, where the keys used to reach the
+--- agent and leave the review waiting. Returns a function that gives the
+--- keys back, restoring a global Terminal-mode map the user had.
+--- Example: `local release = map_terminal({ accept = a, reject = r })`
+---@param actions { accept: fun(), reject: fun() }
+---@return fun() release
+function M.map_terminal(actions)
+  local keys = {
+    { "<M-a>", actions.accept, "Accept the open AI review" },
+    { "<M-r>", actions.reject, "Reject the open AI review" },
+  }
+  local previous = {} ---@type table<string, table|false>
+  for _, key in ipairs(keys) do
+    previous[key[1]] = global_terminal_map(key[1]) or false
+    vim.keymap.set("t", key[1], key[2], { desc = key[3] })
+  end
+  return function()
+    for lhs, map in pairs(previous) do
+      pcall(vim.keymap.del, "t", lhs)
+      if map then
+        vim.fn.mapset("t", false, map)
+      end
+    end
+  end
+end
+
 return M

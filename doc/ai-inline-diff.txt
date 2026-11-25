@@ -51,7 +51,7 @@ their events, so a new release can break it. Versions in use:
   Neovim                 0.12.6
   Claude Code CLI        2.1.325
   claudecode.nvim        main at 2390c6e (v0.3.0+53)
-  OpenCode CLI           2.3.0
+  OpenCode CLI           2.4.1
   opencode.nvim          main at e7643e9
   Antigravity CLI        agy 1.5.17
   antigravity-cli.nvim   main at 43d0d38
@@ -153,6 +153,11 @@ ALT-P                     Select the previous change. Normal, Visual and
 [c                        Select the previous change.
 :write                    Accept the edit.
 
+While a review is open, ALT-A and ALT-R also work in Terminal mode, in any
+terminal: focus is often back in the agent's terminal when a review opens.
+When the review ends they go back to the terminal, and a global
+Terminal-mode map you had for them is restored.
+
 After ALT-Y or ALT-X on the last undecided change the review ends by
 itself: it is accepted with the kept changes, or rejected when every change
 was dropped. Kept changes show a "✓" sign. OpenCode reviews are read-only,
@@ -193,7 +198,9 @@ the inline review once the matching setup function has run.
 :ClaudeCodeCloseAllDiffs  Reject every pending Claude inline review.
 
 :AntigravityDiffAccept    Accept the inline review in the current buffer, or
-                          the latest Antigravity review.
+                          the latest Antigravity review. With none open it
+                          says so, and tells marked lines that the agent
+                          already wrote apart from a review.
 :AntigravityDiffDeny      Reject the inline review in the current buffer, or
                           the latest Antigravity review.
 
@@ -335,6 +342,11 @@ path relative to the worktree rather than the Neovim working directory.
 8. TROUBLESHOOTING                            *ai-inline-diff-troubleshooting*
 
 The agent changed a file without showing a review ~
+                                                 *ai-inline-diff-unreviewed*
+The changed lines are marked in `DiffAdd` (|ai-inline-diff-live-changes|),
+which looks like a review, but the file is already written and there is
+nothing to accept: `<leader>aa` says "No AI review is open" and `u` undoes
+the change. Find out why the agent did not ask:
 
 1. Check whether the agent used a shell command, such as `sed -i`, `echo >`
    or a Python script, instead of its edit tool. Those edits are never
@@ -355,6 +367,11 @@ The agent changed a file without showing a review ~
    the saved rules and their ids with
    `sqlite3 ~/.local/share/opencode/opencode.db "select id from permission"`
    and remove one with `opencode api DELETE /api/permission/saved/<id>`.
+   Such a rule is easy to save by accident in OpenCode's own permission
+   box, in its terminal: `l` or Right moves to "Always allow" and two
+   Enters confirm it, so a sentence typed there while the box is up can
+   do it. Answer reviews with ALT-A or ALT-R instead, which work from that
+   terminal too while a review is open.
 4. For Claude Code, check that the status bar shows `manual mode on`
    (mode `default`). `auto` and `acceptEdits` write edits without asking.
    Set `permissions.defaultMode = "default"` in `~/.claude/settings.json`,
@@ -382,8 +399,20 @@ reload of the buffer from disk (checktime, live changes) is not a change.
 Paths are relative to the plugin's root directory.
 
 lua/ai_inline_diff/init.lua
-    Public functions, opening and closing a review, and the adapter for
-    each agent.
+    Public functions.
+lua/ai_inline_diff/review_session.lua
+    Opening and closing a review.
+lua/ai_inline_diff/claude_adapter.lua
+lua/ai_inline_diff/opencode_adapter.lua
+lua/ai_inline_diff/antigravity_adapter.lua
+lua/ai_inline_diff/agy_hook.lua
+bin/agy-review-hook.lua
+    The adapter for each agent: Claude Code, OpenCode, Antigravity 1.2
+    (antigravity-cli.nvim) and agy 1.5 (the PreToolUse hook).
+lua/ai_inline_diff/target_file.lua
+    Reading the target file and resolving the path an agent sent.
+lua/ai_inline_diff/unified_patch.lua
+    Rebuilding the file an OpenCode patch produces.
 lua/ai_inline_diff/review_selection.lua
     Selecting a change when a review opens, on ]c/[c and on ALT-N/ALT-P.
 lua/ai_inline_diff/review_keys.lua

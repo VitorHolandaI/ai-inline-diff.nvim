@@ -130,8 +130,9 @@ end
 local Queue = {}
 Queue.__index = Queue
 
---- Review queue for agy's hook. `deps` comes from init.lua, which owns the
---- review windows. Example: `local hook = agy_hook.new(deps); hook:start(raw)`
+--- Review queue for agy's hook. init.lua builds `deps` from
+--- review_session.lua, which owns the review windows.
+--- Example: `local hook = agy_hook.new(deps); hook:start(raw)`
 ---@param deps AiInlineDiffAgyDeps
 ---@return AiInlineDiffAgyQueue
 function M.new(deps)

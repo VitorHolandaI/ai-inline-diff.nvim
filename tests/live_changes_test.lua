@@ -158,6 +158,9 @@ local function test_unreviewed_write_is_announced()
   capture_notices(nvim)
   agent_writes(path, { "one", "TWO", "three", "four" })
   local expected = string.format("Agent changed %s without a review: +2 -1 lines", vim.fn.fnamemodify(path, ":~:."))
+    .. '\nIt did not ask first: a saved OpenCode "Always allow",'
+    .. "\nClaude in auto mode, or a shell command."
+    .. "\nSee :help ai-inline-diff-unreviewed"
   check("unreviewed write names the file and line counts", unreviewed_notices(nvim), { expected })
   check("unreviewed write notice is INFO", nvim:lua("return (_G.notices[1] or {}).level"), vim.log.levels.INFO)
   nvim:stop()

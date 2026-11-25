@@ -81,11 +81,15 @@ local function announce_unreviewed(path, hunks)
     removed = removed + hunk[2]
     added = added + hunk[4]
   end
-  vim.notify(
+  -- Short lines: the notification box cuts long ones. The marks look like
+  -- a review, so the message says plainly that nothing asked.
+  local lines = {
     string.format("Agent changed %s without a review: +%d -%d lines", vim.fn.fnamemodify(path, ":~:."), added, removed),
-    vim.log.levels.INFO,
-    { title = "ai-inline-diff" }
-  )
+    'It did not ask first: a saved OpenCode "Always allow",',
+    "Claude in auto mode, or a shell command.",
+    "See :help ai-inline-diff-unreviewed",
+  }
+  vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO, { title = "ai-inline-diff" })
 end
 
 ---@param path string
@@ -206,6 +210,14 @@ end
 ---@param proposed_text string
 function M.expect_accepted_write(path, proposed_text)
   accepted_writes[paths.canonical_path(path)] = text.split(proposed_text)
+end
+
+--- Whether `buf` shows marks for a change an agent wrote without a review.
+--- Example: `if live_changes.has_marks(0) then ... end`
+---@param buf integer
+---@return boolean
+function M.has_marks(buf)
+  return #vim.api.nvim_buf_get_extmarks(buf, namespace, 0, -1, { limit = 1 }) > 0
 end
 
 --- Reload files that change on disk while open and unmodified, and mark

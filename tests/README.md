@@ -30,7 +30,12 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   (`../lua/ai_inline_diff/review_selection.lua`), `]c`/`[c`, and `<M-n>`,
   `<M-p>`, `<M-a>`, `<M-r>` and `da` from each mode
   (`../lua/ai_inline_diff/review_keys.lua`), and the key hint: one box
-  reused across reviews and closed when the review ends.
+  reused across reviews and closed when the review ends. It also checks
+  that `<M-a>`/`<M-r>` answer a review from the agent's terminal and leave
+  focus there, that the terminal gets the keys back afterwards (a user's
+  own Terminal-mode map included), and that `:AntigravityDiffAccept` with
+  no review open says so, or that the agent already wrote the marked
+  lines.
 - `scenarios_test.lua` replays each folder in `scenarios/` (see
   `scenarios/README.md`) in its own child Neovim and compares what the agent
   would write with the scenario's `expected.*`. Pass a folder name to run
@@ -76,8 +81,8 @@ access the first time, to clone the pinned agent plugins into `.deps/`.
   a file written on disk reloads and gets marked, a second write replaces
   the marks, Insert mode or an edit clears them, unsaved user text is never
   replaced, the user's own `:w` is not marked, and a temp-file-and-rename
-  write is still seen. An unreviewed write is announced with the file and
-  line counts, and the agent's write after an accepted OpenCode review is
+  write is still seen. An unreviewed write is announced with the file, the
+  line counts and why no review came, and the agent's write after an accepted OpenCode review is
   not.
 - `patch_test.lua` calls `apply_unified_patch()` directly with hunk headers
   at the edge of what the parser takes: omitted counts, leading zeros,
